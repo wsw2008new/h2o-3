@@ -12,14 +12,19 @@ checkGLMModel <- function(myGLM.h2o, myGLM.r) {
   print(sort(myGLM.h2o@model$coefficients_table$coefficients))
   print("R Coefficients")
   print(sort(coeff.R))
-  checkEqualsNumeric(sort(h2o.coef(myGLM.h2o)), sort(coeff.R), tolerance = 3.8)
-  checkEqualsNumeric(h2o.null_deviance(myGLM.h2o), myGLM.r$nulldev, tolerance = 1.5)
+  ## Tolerance for checkEqualsNumeric is the mean RELATIVE difference
+  checkEqualsNumeric(sort(h2o.coef(myGLM.h2o)), sort(coeff.R), tolerance = 0.01)
+  checkEqualsNumeric(h2o.null_deviance(myGLM.h2o), myGLM.r$nulldev, tolerance = 0.01)
+  
+  r_lambda = myGLM.r$lambda
+  r_dev = myGLM.r$nulldev*(1-myGLM.r$dev.ratio[length(r_lambda)])
+  checkEqualsNumeric(h2o.residual_deviance(myGLM.h2o), r_dev ,  tolerance = 0.01)
 }
 
 l1norm <- function(x) sum(abs(x))
 l2norm <- function(x) sum(x^2)
 penalty <- function(alpha, beta){
-  (1-alpha) * l2norm(beta) + alpha * l1norm(beta)
+  (1-alpha) * 0.5 * l2norm(beta) + alpha * l1norm(beta)
 }
 
 gaussian_obj <- function(deviance, nobs, lambda, alpha, beta) {
@@ -33,7 +38,7 @@ binomial_obj <- function(deviance, nobs, lambda, alpha, beta) {
 checkGLMModel2 <- function(myGLM.h2o,myGLM.r){
   if(inherits(myGLM.h2o, "H2OModel")){
     f = myGLM.h2o@allparameters$family
-    dev = myGLM.h2o@model$training_metrics@metrics$null_deviance
+    dev = myGLM.h2o@model$training_metrics@metrics$residual_deviance
     nobs = myGLM.h2o@model$training_metrics@metrics$residual_degrees_of_freedom
     lambda = myGLM.h2o@allparameters$lambda
     alpha = myGLM.h2o@allparameters$alpha
