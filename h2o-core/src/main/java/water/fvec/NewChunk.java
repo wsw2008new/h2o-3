@@ -109,7 +109,7 @@ public class NewChunk extends Chunk {
 
     public void add(long l) {
       set(_c++,l);
-      if(l != 0) ++_nzs;
+//      if(l != 0) ++_nzs;
     }
 
     public void set(int idx, long l) {
@@ -168,16 +168,28 @@ public class NewChunk extends Chunk {
     private void setRaw(byte b, int idx) {
       if(_c >= _vals1.length)
         _vals1 = Arrays.copyOf(_vals1,_vals1.length*2);
+      if(_vals1[idx] == 0)
+        _nzs += (b == 0)?0:1;
+      else
+        _nzs -= (b ==0)?1:0;
       _vals1[idx] = b;
     }
     private void setRaw(int i, int idx) {
       if(_c >= _vals4.length)
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
+      if(_vals4[idx] == 0)
+        _nzs += (i == 0)?0:1;
+      else
+        _nzs -= (i == 0)?1:0;
       _vals4[idx] = i;
     }
     private void setRaw(long l, int idx) {
       if(_c >= _vals8.length)
         _vals8 = Arrays.copyOf(_vals8,_vals8.length*2);
+      if(_vals8[idx] == 0)
+        _nzs += (l == 0)?0:1;
+      else
+        _nzs -= (l ==0)?1:0;
       _vals8[idx] = l;
     }
 
@@ -243,7 +255,13 @@ public class NewChunk extends Chunk {
   public transient int    _is[];   // _is[] index of strings - holds offsets into _ss[]. _is[i] == -1 means NA/sparse
 
   int   [] alloc_indices(int l)  { return _id = MemoryManager.malloc4(l); }
-  double[] alloc_doubles(int l)  { return _ds = MemoryManager.malloc8d(l); }
+  double[] alloc_doubles(int l)  {
+    if(_ms != null && _ms._c == 0) {
+      _ms = null;
+      _xs = null;
+    }
+    return _ds = MemoryManager.malloc8d(l);
+  }
   int   [] alloc_str_indices(int l) { return _is = MemoryManager.malloc4(l); }
 
   final protected int   []  indices() { return _id; }
@@ -514,7 +532,7 @@ public class NewChunk extends Chunk {
       boolean predicate = _sparseNA ? (val != Long.MAX_VALUE || exp != Integer.MIN_VALUE): val != 0;
       int [] id = _id;
       if(_id == null || predicate) {
-        if(_ms == null || _ms._c == _sparseLen)
+        if(_ms == null || _ms.len() == _sparseLen)
           append2slow();
         if(_id == null || predicate) {
           long t;                // Remove extra scaling
@@ -771,7 +789,7 @@ public class NewChunk extends Chunk {
       _ms.switchToLongs();
       alloc_doubles(4);
     }
-    assert _sparseLen == 0 || _ms._c > _sparseLen :"_ls.length = " + _ms._c + ", _len = " + _sparseLen;
+    assert _sparseLen == 0 || _ms._c >= _sparseLen :"_ls.length = " + _ms._c + ", _len = " + _sparseLen;
   }
   // Slow-path append string
   private void append2slowstr() {
@@ -970,7 +988,9 @@ public class NewChunk extends Chunk {
     set_sparseLen(num_noncompressibles);
     if (_ms != null) {
       _ms._c = num_noncompressibles;
-      assert _ms._nzs == num_noncompressibles;
+
+      assert _sparseNA || _ms._nzs == num_noncompressibles:"nzs = " + _ms._nzs + ", non-compressibles = " + num_noncompressibles;
+      assert !_sparseNA || _ms._nas == (_len - num_noncompressibles):"nas = " + _ms._nas + ", non-compressibles = " + num_noncompressibles + ", len = " + _len;
     }
     if (_xs != null) _xs._c = num_noncompressibles;
   }
