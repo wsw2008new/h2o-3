@@ -336,6 +336,8 @@ public class NewChunk extends Chunk {
   public void setDoubles(double[] ds) {
     _ds = ds;
     _sparseLen = _len = ds.length;
+    _ms = null;
+    _xs = null;
   }
 
   public void set_vec(Vec vec) { _vec = vec; }
@@ -971,8 +973,6 @@ public class NewChunk extends Chunk {
       assert _ms._nzs == num_noncompressibles;
     }
     if (_xs != null) _xs._c = num_noncompressibles;
-    for (int i = 0; i < _ms._c; ++i)
-      assert !is_compressible(_ms.get(i), _xs.get(i));
   }
 
   private boolean is_compressible(double d) {
