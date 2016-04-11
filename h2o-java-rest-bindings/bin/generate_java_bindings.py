@@ -16,7 +16,7 @@ parser.add_argument('--verbose', '-v', help='verbose output', action='store_true
 parser.add_argument('--usecloud', help='ip:port to attach to', default='')
 parser.add_argument('--host', help='hostname to attach to', default='localhost')
 parser.add_argument('--port', help='port to attach to', type=int, default=54321)
-parser.add_argument('--dest', help='destination directory', default=(here + '/../build/src-gen/main/java'))
+parser.add_argument('--dest', help='destination directory', default=(here + '/../src-gen/main/java'))
 args = parser.parse_args()
 
 h2o.H2O.verbose = True if args.verbose else False
@@ -214,7 +214,7 @@ def generate_retrofit_proxies(endpoints_meta, all_schemas_map):
             if path == "/3/ModelMetrics/frames/(?<frame>.*)/models/(?<model>.*)" or \
                path == "/3/ModelMetrics/frames/(?<frame>.*)":
                 continue
-            
+
             path_parm_names = meta['path_params']
 
             # replace all the vars in the path with the actual field names from path_params
@@ -257,12 +257,12 @@ def generate_retrofit_proxies(endpoints_meta, all_schemas_map):
                 is_post = True
             else:
                 is_post = False
-            
+
             input_schema = all_schemas_map[input_schema_name]
 
             # calculate indent
             indent = ' ' * len('    Call<{output_schema_name}> {method}('.format(output_schema_name = output_schema_name, method = method))
-            
+
             # include path parms first, and then POST body parms
             first_parm = True
             for parm in path_parm_names:
@@ -477,7 +477,7 @@ public class Example {
                 System.err.println("Caught exception: " + e);
             }
             if (! jobs_response.isSuccessful())
-                if (retries-- > 0) 
+                if (retries-- > 0)
                    continue;
                 else
                     throw new RuntimeException("/3/Jobs/{job_id} failed 3 times.");
