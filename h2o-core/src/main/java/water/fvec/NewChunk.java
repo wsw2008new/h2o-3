@@ -37,7 +37,7 @@ public class NewChunk extends Chunk {
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
       _vals4[idx] = x;
     }
-    public void add(int v) {set(_c++,v);}
+    public void add(int v) {set(_c,v);++_c;}
     public void set(int idx, int x) {
       if(_vals1 != null){
         byte b = (byte)x;
@@ -76,8 +76,9 @@ public class NewChunk extends Chunk {
     private static int  CATEGORICAL_2 = Integer.MIN_VALUE+1;
 
     public void addNA(){
-      if(_vals1 != null) setRaw(_c++,Byte.MIN_VALUE);
-      else setRaw(_c++,Integer.MIN_VALUE);
+      if(_vals1 != null) setRaw(_c,Byte.MIN_VALUE);
+      else setRaw(_c,Integer.MIN_VALUE);
+      ++_c;
     }
     public void addCategorical() {
       if(_vals1 != null) setRaw(_c++,CATEGORICAL_1);
@@ -108,7 +109,8 @@ public class NewChunk extends Chunk {
     public Mantissas(int cap) {_vals1 = MemoryManager.malloc1(cap);}
 
     public void add(long l) {
-      set(_c++,l);
+      set(_c,l);
+      ++_c;
 //      if(l != 0) ++_nzs;
     }
 
@@ -215,10 +217,11 @@ public class NewChunk extends Chunk {
     public void addNA() {
       ++_nas;
       ++_nzs;
-      int idx = _c++;
+      int idx = _c;
       if(_vals1 != null) setRaw(Byte.MAX_VALUE,idx);
       else if(_vals4 != null) setRaw(Integer.MAX_VALUE,idx);
       else setRaw(Long.MAX_VALUE,idx);
+      ++_c;
     }
 
     public void move(int to, int from) {
@@ -507,10 +510,11 @@ public class NewChunk extends Chunk {
     else if( isString() ) addStr(null);
     else if (_ds != null) addNum(Double.NaN);
     else {
-      _ms.addNA();
-      _xs.addNA();
-      if(!_sparseNA)
+      if(!_sparseNA) {
+        _ms.addNA();
+        _xs.addNA();
         ++_sparseLen;
+      }
       assert _ms._c == _sparseLen:"_ms._c = " + _ms._c +", sparseLen = " + _sparseLen;
       ++_len;
     }
@@ -544,7 +548,6 @@ public class NewChunk extends Chunk {
           }
           assert _ms._c == _sparseLen : "_ms._c = " + _ms._c + ", sparseLen = " + _sparseLen;
           _ms.add(val);
-          assert _id == null || val != 0;
           _xs.add(exp);
           assert _id == null || _id.length == _ms.len():"id.len = " + _id.length + ", ms.len = " + _ms.len() +", old ms.len = " + len + ", sparseLen = " + slen;
           if(_id != null)_id[_sparseLen] = _len;
@@ -847,7 +850,7 @@ public class NewChunk extends Chunk {
         else if((nonnas+1)*_sparseRatio < _len) {
           set_sparse(nonnas,Compress.NA);
           assert _sparseLen == 0 || _sparseLen <= _ms._c:"_sparseLen = " + _sparseLen + ", _ls.length = " + _ms._c + ", nonnas = " + nonnas +  ", len = " + _len;
-          assert _id.length == _ms._c;
+          assert _id.length == _ms.len():"id.len = " + _id.length + ", ms.c = " + _ms._c;
           assert _sparseLen <= _len;
           return;        
         }
