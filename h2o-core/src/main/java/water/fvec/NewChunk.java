@@ -170,6 +170,7 @@ public class NewChunk extends Chunk {
     private void setRaw(byte b, int idx) {
       while(idx == _vals1.length)
         _vals1 = Arrays.copyOf(_vals1,_vals1.length*2);
+      if(_vals1[idx] == Byte.MAX_VALUE)--_nas;
       if(_vals1[idx] == 0)
         _nzs += (b == 0)?0:1;
       else
@@ -179,6 +180,7 @@ public class NewChunk extends Chunk {
     private void setRaw(int i, int idx) {
       while(idx >= _vals4.length)
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
+      if(_vals1[idx] == Integer.MAX_VALUE)--_nas;
       if(_vals4[idx] == 0)
         _nzs += (i == 0)?0:1;
       else
@@ -188,6 +190,7 @@ public class NewChunk extends Chunk {
     private void setRaw(long l, int idx) {
       while(idx >= _vals8.length)
         _vals8 = Arrays.copyOf(_vals8,_vals8.length*2);
+      if(_vals8[idx] == Long.MAX_VALUE)--_nas;
       if(_vals8[idx] == 0)
         _nzs += (l == 0)?0:1;
       else
@@ -215,8 +218,7 @@ public class NewChunk extends Chunk {
     }
 
     public void addNA() {
-      ++_nas;
-      ++_nzs;
+      _nas++;
       int idx = _c;
       if(_vals1 != null) setRaw(Byte.MAX_VALUE,idx);
       else if(_vals4 != null) setRaw(Integer.MAX_VALUE,idx);
@@ -511,8 +513,11 @@ public class NewChunk extends Chunk {
     else if (_ds != null) addNum(Double.NaN);
     else {
       if(!_sparseNA) {
+        if(_ms.len() == _sparseLen)
+          append2slow();
         _ms.addNA();
         _xs.addNA();
+        if(_id != null)  _id[_sparseLen] = _len;
         ++_sparseLen;
       }
       assert _ms._c == _sparseLen:"_ms._c = " + _ms._c +", sparseLen = " + _sparseLen;
@@ -520,11 +525,7 @@ public class NewChunk extends Chunk {
     }
     assert _ms == null || _ms._c == _sparseLen:"_ms._c = " + _ms._c +", sparseLen = " + _sparseLen;
   }
-  public void addNumSparse (long val, int exp, int id) {
-    _id[_sparseLen] = id;
-    addNum(val,exp);
-    assert _ms == null || _ms._c == _sparseLen:"_ms._c = " + _ms._c +", sparseLen = " + _sparseLen;
-  }
+
   public void addNum (long val, int exp) {
     if( isUUID() || isString() ) addNA();
     else if(_ds != null) {
