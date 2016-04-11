@@ -35,7 +35,7 @@ sudo apt-get install -y \
   python-pip
 
 # Python packages
-sudo pip install grip tabulate wheel numpy scikit-learn scipy requests future
+sudo pip install grip tabulate wheel numpy scikit-learn scipy requests future six 
 
 # R
 sudo apt-get install -y r-base-core=3.2.2-1trusty0
