@@ -28,12 +28,12 @@ public class NewChunk extends Chunk {
     int _c;
 
     private void setRaw(int idx, byte b) {
-      if(_c >= _vals1.length)
+      while(idx >= _vals1.length)
         _vals1 = Arrays.copyOf(_vals1,_vals1.length*2);
       _vals1[idx] = b;
     }
     private void setRaw(int idx, int x) {
-      if(_c >= _vals4.length)
+      while(idx >= _vals4.length)
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
       _vals4[idx] = x;
     }
@@ -166,7 +166,7 @@ public class NewChunk extends Chunk {
     }
 
     private void setRaw(byte b, int idx) {
-      if(_c >= _vals1.length)
+      while(idx == _vals1.length)
         _vals1 = Arrays.copyOf(_vals1,_vals1.length*2);
       if(_vals1[idx] == 0)
         _nzs += (b == 0)?0:1;
@@ -175,7 +175,7 @@ public class NewChunk extends Chunk {
       _vals1[idx] = b;
     }
     private void setRaw(int i, int idx) {
-      if(_c >= _vals4.length)
+      while(idx >= _vals4.length)
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
       if(_vals4[idx] == 0)
         _nzs += (i == 0)?0:1;
@@ -184,7 +184,7 @@ public class NewChunk extends Chunk {
       _vals4[idx] = i;
     }
     private void setRaw(long l, int idx) {
-      if(_c >= _vals8.length)
+      while(idx >= _vals8.length)
         _vals8 = Arrays.copyOf(_vals8,_vals8.length*2);
       if(_vals8[idx] == 0)
         _nzs += (l == 0)?0:1;
@@ -534,6 +534,8 @@ public class NewChunk extends Chunk {
       if(_id == null || predicate) {
         if(_ms == null || _ms.len() == _sparseLen)
           append2slow();
+        int len = _ms.len();
+        int slen = _sparseLen;
         if(_id == null || predicate) {
           long t;                // Remove extra scaling
           while (exp < 0 && exp > -9999999 && (t = val / 10) * 10 == val) {
@@ -544,6 +546,7 @@ public class NewChunk extends Chunk {
           _ms.add(val);
           assert _id == null || val != 0;
           _xs.add(exp);
+          assert _id == null || _id.length == _ms.len():"id.len = " + _id.length + ", ms.len = " + _ms.len() +", old ms.len = " + len + ", sparseLen = " + slen;
           if(_id != null)_id[_sparseLen] = _len;
           _sparseLen++;
           assert _ms._c == _sparseLen : "_ms._c = " + _ms._c + ", sparseLen = " + _sparseLen;
@@ -848,11 +851,10 @@ public class NewChunk extends Chunk {
           assert _sparseLen <= _len;
           return;        
         }
-      } 
-      else {
+      } else {
         // verify we're still sufficiently sparse
         if(2*_sparseLen > _len)  cancel_sparse();
-        else _id = MemoryManager.arrayCopyOf(_id, _sparseLen <<1);
+        else _id = MemoryManager.arrayCopyOf(_id, _id.length*2);
       }
     } else {
       _ms = new Mantissas(16);
