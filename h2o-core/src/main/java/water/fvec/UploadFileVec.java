@@ -26,7 +26,7 @@ public class UploadFileVec extends FileVec {
     c._vec = this;              // Attach chunk to this vec.
     DKV.put(chunkKey(cidx),c,fs); // Write updated chunk back into K/V
     long l = _nchunks-1L;
-    _len = (l/_chunkSize + (l % _chunkSize == 0?0:1))+c._len;
+    _len = l*_chunkSize +c._len;
   }
 
   private boolean checkMissing(int cidx, Value val) {
