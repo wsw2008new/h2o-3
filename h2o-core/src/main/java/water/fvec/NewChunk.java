@@ -21,6 +21,10 @@ public class NewChunk extends Chunk {
 
   public void alloc_exponent(int sparseLen) {_xs = new Exponents(sparseLen);}
 
+  public int is(int i) { return _is[i];}
+
+  public void set_is(int i, int val) {_is[i] = val;}
+
   public static class Exponents {
     public Exponents(int cap){_vals1 = MemoryManager.malloc1(cap);}
     byte [] _vals1;
@@ -257,7 +261,7 @@ public class NewChunk extends Chunk {
   public transient int    _id[];   // Indices (row numbers) of stored values, used for sparse
   public transient double _ds[];   // Doubles, for inflating via doubles
   public transient byte   _ss[];   // Bytes of appended strings, including trailing 0
-  public transient int    _is[];   // _is[] index of strings - holds offsets into _ss[]. _is[i] == -1 means NA/sparse
+  private  transient int    _is[];   // _is[] index of strings - holds offsets into _ss[]. _is[i] == -1 means NA/sparse
 
   int   [] alloc_indices(int l)  { return _id = MemoryManager.malloc4(l); }
   double[] alloc_doubles(int l)  {
@@ -267,7 +271,13 @@ public class NewChunk extends Chunk {
     }
     return _ds = MemoryManager.malloc8d(l);
   }
-  int   [] alloc_str_indices(int l) { return _is = MemoryManager.malloc4(l); }
+  int   [] alloc_str_indices(int l) {
+    if(_ms != null && _ms._c == 0) {
+      _ms = null;
+      _xs = null;
+    }
+    return _is = MemoryManager.malloc4(l);
+  }
 
   final protected int   []  indices() { return _id; }
   final protected double[]  doubles() { return _ds; }
