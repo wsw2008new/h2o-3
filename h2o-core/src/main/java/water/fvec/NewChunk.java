@@ -184,7 +184,7 @@ public class NewChunk extends Chunk {
     private void setRaw(int i, int idx) {
       while(idx >= _vals4.length)
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
-      if(_vals1[idx] == Integer.MAX_VALUE)--_nas;
+      if(_vals4[idx] == Integer.MAX_VALUE)--_nas;
       if(_vals4[idx] == 0)
         _nzs += (i == 0)?0:1;
       else
