@@ -167,7 +167,7 @@ public abstract class FileVec extends ByteVec {
       int perNodeChunkCountLimit = 1<<21; // don't create more than 2M Chunk POJOs per node
       int minParseChunkSize = 1<<12; // don't read less than this many bytes
       int maxParseChunkSize = Value.MAX-1; // don't read more than this many bytes per map() thread (needs to fit into a Value object)
-      long chunkSize = Math.max((localParseSize / (1*cores))+1, minParseChunkSize); //lower hard limit
+      long chunkSize = Math.max((localParseSize / (4*cores))+1, minParseChunkSize); //lower hard limit
       if(chunkSize > 1024*1024)
         chunkSize = (chunkSize & 0xFFFFFE00) + 512; // align chunk size to 512B
 
