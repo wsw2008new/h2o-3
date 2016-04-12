@@ -1173,7 +1173,8 @@ public class NewChunk extends Chunk {
       final int naCnt = _naCnt;
       for(i=0; i< _sparseLen; i++ )   // Inject all doubles into longs
         if( Double.isNaN(ds[i]) ) {
-          setNA_impl2(i);
+          _ms.addNA();
+          _xs.addNA();
         } else {
           _ms.add((long)ds[i]);
           _xs.add(0);

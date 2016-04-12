@@ -1,6 +1,7 @@
 package water.fvec;
 
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import water.Futures;
 import water.TestUtil;
@@ -21,6 +22,7 @@ import static org.junit.Assert.assertTrue;
  * since it is used to avoid DKV call.
  * */
 public class CBSChunkTest extends TestUtil {
+  @BeforeClass() public static void setup() { stall_till_cloudsize(1); }
   void testImpl(long[] ls, int[] xs, int expBpv, int expGap, int expClen, int expNA) {
     AppendableVec av = new AppendableVec(Vec.newKey(), Vec.T_NUM);
     // Create a new chunk
