@@ -205,16 +205,19 @@ public class NewChunk extends Chunk {
     public void setNA(int i) {
       if (_vals1 != null) {
         if (_vals1[i] != Byte.MAX_VALUE) {
+          if(_vals1[i] == 0) ++_nzs;
           _vals1[i] = Byte.MAX_VALUE;
           ++_nas;
         }
       } else if (_vals4 != null) {
         if (_vals4[i] != Integer.MAX_VALUE) {
+          if(_vals4[i] == 0) ++_nzs;
           _vals4[i] = Integer.MAX_VALUE;
           ++_nas;
         }
       } else {
         if(_vals8[i] != Long.MAX_VALUE) {
+          if(_vals8[i] == 0) ++_nzs;
           _vals8[i] = Long.MAX_VALUE;
           ++_nas;
         }
