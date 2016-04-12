@@ -35,13 +35,15 @@ public class NewChunk extends Chunk {
       while(idx >= _vals1.length)
         _vals1 = Arrays.copyOf(_vals1,_vals1.length*2);
       _vals1[idx] = b;
+      if(_c <= idx) _c = idx+1;
     }
     private void setRaw(int idx, int x) {
       while(idx >= _vals4.length)
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
       _vals4[idx] = x;
+      if(_c <= idx) _c = idx+1;
     }
-    public void add(int v) {set(_c,v);++_c;}
+    public void add(int v) {set(_c,v);}
     public void set(int idx, int x) {
       if(_vals1 != null){
         byte b = (byte)x;
@@ -82,7 +84,6 @@ public class NewChunk extends Chunk {
     public void addNA(){
       if(_vals1 != null) setRaw(_c,Byte.MIN_VALUE);
       else setRaw(_c,Integer.MIN_VALUE);
-      ++_c;
     }
     public void addCategorical() {
       if(_vals1 != null) setRaw(_c++,CATEGORICAL_1);
@@ -112,11 +113,7 @@ public class NewChunk extends Chunk {
 
     public Mantissas(int cap) {_vals1 = MemoryManager.malloc1(cap);}
 
-    public void add(long l) {
-      set(_c,l);
-      ++_c;
-//      if(l != 0) ++_nzs;
-    }
+    public void add(long l) {set(_c,l);}
 
     public void set(int idx, long l) {
       if(_vals1 != null) { // check if we fit withing single byte
@@ -180,6 +177,7 @@ public class NewChunk extends Chunk {
       else
         _nzs -= (b ==0)?1:0;
       _vals1[idx] = b;
+      if(_c <= idx) _c = idx+1;
     }
     private void setRaw(int i, int idx) {
       while(idx >= _vals4.length)
@@ -190,6 +188,7 @@ public class NewChunk extends Chunk {
       else
         _nzs -= (i == 0)?1:0;
       _vals4[idx] = i;
+      if(_c <= idx) _c = idx+1;
     }
     private void setRaw(long l, int idx) {
       while(idx >= _vals8.length)
@@ -200,6 +199,7 @@ public class NewChunk extends Chunk {
       else
         _nzs -= (l ==0)?1:0;
       _vals8[idx] = l;
+      if(_c <= idx) _c = idx+1;
     }
 
     public void setNA(int i) {
@@ -230,7 +230,6 @@ public class NewChunk extends Chunk {
       if(_vals1 != null) setRaw(Byte.MAX_VALUE,idx);
       else if(_vals4 != null) setRaw(Integer.MAX_VALUE,idx);
       else setRaw(Long.MAX_VALUE,idx);
-      ++_c;
     }
 
     public void move(int to, int from) {
