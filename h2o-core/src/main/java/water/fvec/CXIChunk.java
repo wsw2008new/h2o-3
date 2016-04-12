@@ -56,8 +56,7 @@ public class CXIChunk extends Chunk {
   }
 
   @Override public NewChunk inflate_impl(NewChunk nc) {
-    nc._ms = new NewChunk.Mantissas(_sparseLen);
-    nc._xs = new NewChunk.Exponents(_sparseLen);
+    nc.alloc_nums(_sparseLen);
     nc.alloc_indices(_sparseLen);
     int off = _OFF;
     for( int i = 0; i < _sparseLen; ++i, off += _ridsz + _valsz) {

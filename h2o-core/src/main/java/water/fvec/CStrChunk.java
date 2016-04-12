@@ -201,8 +201,7 @@ public class CStrChunk extends Chunk {
   }
   
   public NewChunk asciiEntropy(NewChunk nc) {
-    nc._ds = MemoryManager.malloc8d(_len);
-    
+    nc.alloc_doubles(_len);
     for (int i = 0; i < _len; i++) {
       int off = UnsafeUtils.get4(_mem, (i << 2) + _OFF);
       if (off != NA) {

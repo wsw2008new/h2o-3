@@ -25,6 +25,9 @@ public class NewChunk extends Chunk {
 
   public void set_is(int i, int val) {_is[i] = val;}
 
+  public void alloc_nums(int len) { _ms = new Mantissas(len); _xs = new Exponents(len);}
+
+
   public static class Exponents {
     public Exponents(int cap){_vals1 = MemoryManager.malloc1(cap);}
     byte [] _vals1;
@@ -86,8 +89,8 @@ public class NewChunk extends Chunk {
       else setRaw(_c,Integer.MIN_VALUE);
     }
     public void addCategorical() {
-      if(_vals1 != null) setRaw(_c++,CATEGORICAL_1);
-      else setRaw(_c++,CATEGORICAL_2);
+      if(_vals1 != null) setRaw(_c,CATEGORICAL_1);
+      else setRaw(_c,CATEGORICAL_2);
     }
 
     public void move(int to, int from) {
@@ -258,15 +261,15 @@ public class NewChunk extends Chunk {
   // Sparse: if _sparseLen != _len, then _ls/_ds are compressed to non-zero's only,
   // and _xs is the row number.  Still _len is count of elements including
   // zeros, and _sparseLen is count of non-zeros.
-  public transient Mantissas _ms;   // Mantissa
-  public transient Exponents _xs;   // Exponent, or if _ls==0, NA or Categorical or Rows
-  public transient int    _id[];   // Indices (row numbers) of stored values, used for sparse
-  public transient double _ds[];   // Doubles, for inflating via doubles
-  public transient byte   _ss[];   // Bytes of appended strings, including trailing 0
-  private  transient int    _is[];   // _is[] index of strings - holds offsets into _ss[]. _is[i] == -1 means NA/sparse
+  private transient Mantissas _ms;   // Mantissa
+  private transient Exponents _xs;   // Exponent, or if _ls==0, NA or Categorical or Rows
+  private transient int    _id[];   // Indices (row numbers) of stored values, used for sparse
+  private transient double _ds[];   // Doubles, for inflating via doubles
+  public transient byte[]   _ss;   // Bytes of appended strings, including trailing 0
+  private transient int    _is[];   // _is[] index of strings - holds offsets into _ss[]. _is[i] == -1 means NA/sparse
 
   int   [] alloc_indices(int l)  { return _id = MemoryManager.malloc4(l); }
-  double[] alloc_doubles(int l)  {
+  public double[] alloc_doubles(int l)  {
     if(_ms != null && _ms._c == 0) {
       _ms = null;
       _xs = null;
@@ -813,6 +816,7 @@ public class NewChunk extends Chunk {
       _ds = MemoryManager.arrayCopyOf(_ds, _sparseLen <<1);
     } else {
       _ms = new Mantissas(4);
+      _xs = null;
       _ms.switchToLongs();
       _ds = new double[4];
     }
@@ -899,9 +903,10 @@ public class NewChunk extends Chunk {
   }
   public void close(Futures fs) { close(_cidx,fs); }
 
-  protected void switch_to_doubles(){
+  protected void switch_to_doubles(){ switch_to_doubles(Math.max(4,_sparseLen));}
+  protected void switch_to_doubles(int len){
     assert _ds == null;
-    double [] ds = MemoryManager.malloc8d(_sparseLen);
+    double [] ds = MemoryManager.malloc8d(len);
     for(int i = 0; i < _sparseLen; ++i)
       if(isNA2(i) || isCategorical2(i)) ds[i] = Double.NaN;
       else  ds[i] = _ms.get(i)*PrettyPrint.pow10(_xs.get(i));
@@ -1070,7 +1075,7 @@ public class NewChunk extends Chunk {
   // Return the data so compressed.
   public Chunk compress() {
     assert _ms == null || _sparseLen == _ms._c:"sparseLen = " + _sparseLen + ", _c = " + _ms._c;
-    assert _xs == null || _sparseLen == _xs._c;
+    assert _xs == null || _sparseLen == _xs._c:"sparseLen = " + _sparseLen + ", xs.x = " + _xs._c;
     Chunk res = compress2();
     byte type = type();
     assert _vec == null ||  // Various testing scenarios do not set a Vec
