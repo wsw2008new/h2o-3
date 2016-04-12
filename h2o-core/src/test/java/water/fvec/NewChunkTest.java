@@ -37,9 +37,7 @@ public class NewChunkTest extends TestUtil {
   void post_write() {
     cc.close(0, new Futures()).blockForPending();
   }
-  void remove() {
-    vec.remove();
-  }
+  void remove() {if(vec != null)vec.remove();}
 
   @Test public void testSparseDoubles(){
     NewChunk nc = new NewChunk(new double[]{Math.PI});

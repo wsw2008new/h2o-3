@@ -522,9 +522,9 @@ public class NewChunk extends Chunk {
     else if( isString() ) addStr(null);
     else if (_ds != null) addNum(Double.NaN);
     else {
+      if(!_sparseNA && _ms.len() == _sparseLen)
+        append2slow();
       if(!_sparseNA) {
-        if(_ms.len() == _sparseLen)
-          append2slow();
         _ms.addNA();
         _xs.addNA();
         if(_id != null)  _id[_sparseLen] = _len;
@@ -688,7 +688,15 @@ public class NewChunk extends Chunk {
   }
   
   public void addNAs(int n) {
-    if(!sparseNA()) for (int i = 0; i <n; ++i)addNA();
+    if(!sparseNA())
+      for (int i = 0; i <n; ++i) {
+        addNA();
+        if(sparseNA()) {
+          set_len(_len + n - i -1);
+          return;
+        }
+
+      }
     else set_len(_len + n);
   }
   
@@ -795,7 +803,7 @@ public class NewChunk extends Chunk {
     if( _ds==null && _ms!=null ) { // This can happen for columns with all NAs and then a UUID
       _xs=null;
       _ms.switchToLongs();
-      alloc_doubles(_sparseLen);
+      _ds = MemoryManager.malloc8d(_sparseLen);
       Arrays.fill(_ms._vals8,C16Chunk._LO_NA);
       Arrays.fill(_ds,Double.longBitsToDouble(C16Chunk._HI_NA));
     }
@@ -804,7 +812,7 @@ public class NewChunk extends Chunk {
     } else {
       _ms = new Mantissas(4);
       _ms.switchToLongs();
-      alloc_doubles(4);
+      _ds = new double[4];
     }
     assert _sparseLen == 0 || _ms._c >= _sparseLen :"_ls.length = " + _ms._c + ", _len = " + _sparseLen;
   }
