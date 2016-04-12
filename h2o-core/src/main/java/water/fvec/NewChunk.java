@@ -306,7 +306,7 @@ public class NewChunk extends Chunk {
   private int _uuidCnt;                 // Count of UUIDs
 
   public int _timCnt = 0;
-  protected static final int MIN_SPARSE_RATIO = 16;
+  protected static final int MIN_SPARSE_RATIO = 8;
   private int _sparseRatio = MIN_SPARSE_RATIO;
   public boolean _isAllASCII = true; //For cat/string col, are all characters in chunk ASCII?
 
