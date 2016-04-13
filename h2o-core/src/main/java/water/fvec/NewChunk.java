@@ -125,33 +125,40 @@ public class NewChunk extends Chunk {
     public void add(long l) {set(_c,l);}
 
     public void set(int idx, long l) {
+      if(idx > _c) throw new IndexOutOfBoundsException();
+      if(l == NA_8) throw new IllegalArgumentException("can not store " + l + ", value reserved for missing");
+      long old;
       if(_vals1 != null) { // check if we fit withing single byte
         byte b = (byte)l;
-        if(b == l && b < Byte.MIN_VALUE) {
-          setRaw(b,idx);
-          return;
+        if(b == l && b != NA_1) {
+          old = setRaw(b,idx);
+        } else {
+          int i = (int)l;
+          if(i == l && i != NA_4) {
+            switchToInts();
+            old = setRaw(idx,i);
+          } else {
+            switchToLongs();
+            old = setRaw(idx,l);
+          }
         }
-        int len = _c == _vals1.length?_vals1.length*2:_vals1.length;
-        _vals4 = MemoryManager.malloc4(len);
-        for(int j = 0; j < _c; ++j)
-          _vals4[j] = _vals1[j] == NA_1?NA_4:_vals1[j];
-        _vals1 = null;
-      }
-      if(_vals4 != null) {
+      } else  if(_vals4 != null) {
         int i = (int)l;
-        if(i == l && i < Integer.MIN_VALUE) {
-          setRaw(i,idx);
-          return;
-        }
-        int len = _c == _vals4.length?_vals4.length*2:_vals4.length;
-        _vals8 = MemoryManager.malloc8(len);
-        for(int j = 0; j < _c; ++j)
-          _vals8[j] = _vals4[j] == NA_4?NA_8:_vals4[j];
-        _vals4 = null;
+        if(i != l || i == NA_4) {
+          switchToLongs();
+          old = setRaw(idx,l);
+        } else
+          old = setRaw(idx,i);
+      } else
+        old = setRaw(idx,l);
+      if (old != l) {
+        if (l == 0) ++_nzs;
+        else if (l == NA_1)
+          --_nas;
       }
-      setRaw(l,idx);
     }
     public long get(int id) {
+      if(id >= _c) throw new IndexOutOfBoundsException();
       if(_vals1 != null) {
         long l = _vals1[id];
         return (l == NA_1)?NA_8:l;
@@ -161,6 +168,14 @@ public class NewChunk extends Chunk {
         return (l == NA_4)?NA_8:l;
       }
       return _vals8[id];
+    }
+
+    public void switchToInts() {
+      int len = Math.max(_vals1 == null?0:_vals1.length,_vals4 == null?0:_vals4.length);
+      _vals4 = MemoryManager.malloc4(len);
+      if(_c > 0)
+        for(int i = 0; i < _c; ++i)
+          _vals8[i] = _vals1[i] == NA_1?NA_8:_vals1[i];
     }
 
     public void switchToLongs() {
@@ -177,72 +192,53 @@ public class NewChunk extends Chunk {
       }
     }
 
-    private void setRaw(byte b, int idx) {
+    private byte setRaw(int idx, byte val) {
       while(idx == _vals1.length)
         _vals1 = Arrays.copyOf(_vals1,_vals1.length*2);
-      if(_vals1[idx] == NA_1)--_nas;
-      if(_vals1[idx] == 0)
-        _nzs += (b == 0)?0:1;
-      else
-        _nzs -= (b ==0)?1:0;
-      _vals1[idx] = b;
+      byte old = _vals1[idx];
+      _vals1[idx] = val;
       if(_c <= idx) _c = idx+1;
+      return old;
     }
-    private void setRaw(int i, int idx) {
+    private int setRaw(int idx, int val) {
       while(idx >= _vals4.length)
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
-      if(_vals4[idx] == NA_4)--_nas;
-      if(_vals4[idx] == 0)
-        _nzs += (i == 0)?0:1;
-      else
-        _nzs -= (i == 0)?1:0;
-      _vals4[idx] = i;
+      int old = _vals4[idx];
+      _vals4[idx] = val;
       if(_c <= idx) _c = idx+1;
+      return old;
     }
-    private void setRaw(long l, int idx) {
+    private long setRaw(int idx, long val) {
       while(idx >= _vals8.length)
         _vals8 = Arrays.copyOf(_vals8,_vals8.length*2);
-      if(_vals8[idx] == NA_8)--_nas;
-      if(_vals8[idx] == 0)
-        _nzs += (l == 0)?0:1;
-      else
-        _nzs -= (l ==0)?1:0;
-      _vals8[idx] = l;
+      long old = _vals8[idx];
+      _vals8[idx] = val;
       if(_c <= idx) _c = idx+1;
+      return old;
     }
 
     public void setNA(int i) {
+      if(i > _c) throw new IndexOutOfBoundsException();
       if (_vals1 != null) {
-        if (_vals1[i] != NA_1) {
-          if(_vals1[i] == 0) ++_nzs;
-          _vals1[i] = NA_1;
-          ++_nas;
-        }
+        byte old = setRaw(i,NA_1);
+        if (old != NA_1) ++_nas;
+        if(old == 0) ++_nzs;
       } else if (_vals4 != null) {
-        if (_vals4[i] != NA_4) {
-          if(_vals4[i] == 0) ++_nzs;
-          _vals4[i] = NA_4;
-          ++_nas;
-        }
+        int old = setRaw(i,NA_4);
+        if (old != NA_4) ++_nas;
+        if (old == 0) ++_nzs;
       } else {
-        if(_vals8[i] != NA_8) {
-          if(_vals8[i] == 0) ++_nzs;
-          _vals8[i] = NA_8;
-          ++_nas;
-        }
+        long old = setRaw(i,NA_8);
+        if (old != NA_8) ++_nas;
+        if (old == 0) ++_nzs;
       }
     }
 
-
-    public void addNA() {
-      _nas++;
-      int idx = _c;
-      if(_vals1 != null) setRaw(NA_1,idx);
-      else if(_vals4 != null) setRaw(NA_4,idx);
-      else setRaw(NA_8,idx);
-    }
+    public void addNA() {setNA(_c);}
 
     public void move(int to, int from) {
+      if(to >= _c) throw new IndexOutOfBoundsException();
+      if(from >= _c) throw new IndexOutOfBoundsException();
       if(_vals1 != null) {
         _vals1[to] = _vals1[from];
       } else if(_vals4 != null) {
@@ -260,6 +256,7 @@ public class NewChunk extends Chunk {
     final long NA_8 = Long.MIN_VALUE;
 
     public boolean isNA(int idx) {
+      if(idx >= _c) throw new IndexOutOfBoundsException();
       if(_vals1 != null) return _vals1[idx] == NA_1;
       if(_vals4 != null) return _vals4[idx] == NA_4;
       if(_vals8 != null) return _vals8[idx] == NA_8;
