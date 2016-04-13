@@ -532,6 +532,7 @@ public class NewChunk extends Chunk {
         append2slow();
       if(!_sparseNA) {
         _ms.addNA();
+        _xs.add(0);
         if(_id != null)  _id[_sparseLen] = _len;
         ++_sparseLen;
       }
@@ -1030,7 +1031,7 @@ public class NewChunk extends Chunk {
   }
   
   private boolean is_compressible(long l, int x) {
-    return _sparseNA ? l == Long.MAX_VALUE && x == Integer.MIN_VALUE : l == 0 && x ==0;
+    return _sparseNA ? l == Long.MIN_VALUE : l == 0 && x ==0;
   }
   
   public void cancel_sparse(){
@@ -1602,6 +1603,7 @@ public class NewChunk extends Chunk {
     if( isNA2(i) ) return true;
     if( _ms != null ) {
       _ms.setNA(i);
+      _xs.set(i,0);
     }
     if( _ds != null ) { _ds[i] = Double.NaN; }
     if (_is != null) { _is[i] = -1; }
