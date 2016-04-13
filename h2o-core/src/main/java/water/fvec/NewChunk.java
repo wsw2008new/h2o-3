@@ -541,8 +541,11 @@ public class NewChunk extends Chunk {
   }
 
   public void addCategorical(int e) {
+    if(_ms == null || _ms.len() == _sparseLen)
+      append2slow();
     _ms.add(e);
     _xs.addCategorical();
+    if(_id != null) _id[_sparseLen] = _len;
     ++_sparseLen;
     assert _ms._c == _sparseLen:"_ms._c = " + _ms._c +", sparseLen = " + _sparseLen;
     ++_len;
@@ -946,7 +949,9 @@ public class NewChunk extends Chunk {
   protected void set_sparse(int num_noncompressibles, Compress sparsity_type) {
     if ((sparsity_type == Compress.ZERO && isSparseNA()) || (sparsity_type == Compress.NA && isSparseZero()))
       cancel_sparse();
-    if (sparsity_type == Compress.NA) _sparseNA = true;
+    if (sparsity_type == Compress.NA) {
+      _sparseNA = true;
+    }
     if (_id != null && _sparseLen == num_noncompressibles && _len != 0) return;
     if (_id != null) { // we have sparse representation but some compressible elements in it!
       // can happen when setting a non-compressible element to a compressible one on sparse chunk
@@ -1017,10 +1022,10 @@ public class NewChunk extends Chunk {
       } else {
         assert num_noncompressibles <= _sparseLen;
         _id = alloc_indices(_ms.len());
-        int x = 0;
         for (int i = 0; i < _sparseLen; ++i) {
-          if (is_compressible(_ms.get(i), _xs.get(i))) ++cs;
-          else {
+          if (is_compressible(_ms.get(i), _xs.get(i))) {
+            ++cs;
+          } else {
             _ms.move(i - cs, i);
             _xs.move(i - cs, i);
             _id[i - cs] = i;
@@ -1054,7 +1059,7 @@ public class NewChunk extends Chunk {
   }
   
   private boolean is_compressible(long l, int x) {
-    return _sparseNA ? l == Long.MIN_VALUE : l == 0 && x ==0;
+    return _sparseNA ? l == Long.MIN_VALUE : l == 0;
   }
   
   public void cancel_sparse(){
@@ -1069,11 +1074,9 @@ public class NewChunk extends Chunk {
         Mantissas ms = new Mantissas(_len);
         xs._c = _len;
         ms._c = _len;
-        if (_sparseNA) {
-          for(int i = 0; i < _len; ++i) {
-            ms.addNA();
-          }
-        }
+        if (_sparseNA)
+          for(int i = 0; i < _len; ++i)
+            ms.setNA(i);
         for(int i = 0; i < _sparseLen; ++i){
           xs.set(_id[i],_xs.get(i));
           ms.set(_id[i],_ms.get(i));
@@ -1243,8 +1246,7 @@ public class NewChunk extends Chunk {
       if( isNA2(i) ) continue;
       long l = _ms.get(i);
       int  x = _xs.get(i);
-      assert x != Integer.MIN_VALUE:"l = " + l + ", x = " + x;
-      if( x==Integer.MIN_VALUE+1) x=0; // Replace categorical flag with no scaling
+      if( x==Integer.MIN_VALUE) x=0; // Replace categorical flag with no scaling
       assert l!=0 || x==0:"l == 0 while x = " + x + " ms = " + _ms.toString();      // Exponent of zero is always zero
       long t;                   // Remove extra scaling
       while( l!=0 && (t=l/10)*10==l ) { l=t; x++; }
