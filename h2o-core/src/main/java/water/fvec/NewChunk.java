@@ -48,10 +48,10 @@ public class NewChunk extends Chunk {
     }
     public void add(int v) {set(_c,v);}
 
-    private void alloc_data(){
+    private void alloc_data(int x){
       // need to allocatre new array, has to match the lenght of mantissa
       int len = 4;
-      while(len < _c) len = len << 1;
+      while(len < x) len = len << 1;
       _vals1 = MemoryManager.malloc1(len);
     }
     public void set(int idx, int x) {
@@ -60,7 +60,7 @@ public class NewChunk extends Chunk {
           if(idx >= _c) _c = idx+1;
           return;
         }
-        alloc_data();
+        alloc_data(idx);
       }
       if(_vals1 != null){
         byte b = (byte)x;
@@ -97,7 +97,7 @@ public class NewChunk extends Chunk {
     private static int  CATEGORICAL_2 = Integer.MIN_VALUE+1;
 
     public void addCategorical() {
-      if(_vals1 == null && _vals4 == null) alloc_data();
+      if(_vals1 == null && _vals4 == null) alloc_data(_c);
       if(_vals1 != null) setRaw(_c,CATEGORICAL_1);
       else setRaw(_c,CATEGORICAL_2);
     }
@@ -1543,7 +1543,8 @@ public class NewChunk extends Chunk {
       if(idx >= 0)i = idx;
       else cancel_sparse(); // for now don't bother setting the sparse value
     }
-    _ms.set(i,l); _xs.set(i,0);
+    _ms.set(i,l);
+    _xs.set(i,0);
     _naCnt = -1;
     return true;
   }
