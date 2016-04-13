@@ -31,7 +31,7 @@ public class NewChunk extends Chunk {
   public static class Exponents {
     public Exponents(int cap){}
     byte [] _vals1;
-    int [] _vals4;
+    int  [] _vals4;
     int _c;
 
     private void setRaw(int idx, byte b) {
@@ -46,7 +46,6 @@ public class NewChunk extends Chunk {
       _vals4[idx] = x;
       if(_c <= idx) _c = idx+1;
     }
-    public void add(int v) {set(_c,v);}
 
     private void alloc_data(int x){
       // need to allocatre new array, has to match the lenght of mantissa
@@ -54,6 +53,10 @@ public class NewChunk extends Chunk {
       while(len < x) len = len << 1;
       _vals1 = MemoryManager.malloc1(len);
     }
+
+    public void add(int v) {set(_c,v);}
+
+
     public void set(int idx, int x) {
       if(_vals1 == null && _vals4 == null) {
         if(x == 0) {
@@ -72,11 +75,8 @@ public class NewChunk extends Chunk {
           int len = _vals1.length;
           if(_vals1.length == _c) len = 2*len;
           _vals4 = MemoryManager.malloc4(len);
-          for (int i = 0; i < _c; ++i) {
-            int j = _vals1[i];
-            if(j == Byte.MIN_VALUE+1) j = Integer.MIN_VALUE+1;
-            _vals4[i] = j;
-          }
+          for (int i = 0; i < _c; ++i)
+            _vals4[i] = (_vals1[i] == CATEGORICAL_1)?CATEGORICAL_2:_vals1[i];
           _vals1 = null;
         }
       }
@@ -86,15 +86,16 @@ public class NewChunk extends Chunk {
       if(_vals1 == null && null == _vals4) return 0;
       if(_vals1 != null) {
         int x = _vals1[id];
-        if(x == Byte.MIN_VALUE +1)
-          x = Integer.MIN_VALUE+1;
+        if(x == CATEGORICAL_1)
+          x = CATEGORICAL_2;
         return x;
       }
       return _vals4[id];
     }
+    public boolean isCategorical(int i) { return _vals1 !=  null && _vals1[i] == CATEGORICAL_1 || _vals4 != null && _vals4[i] == CATEGORICAL_2;}
 
-    private static byte CATEGORICAL_1 = Byte.MIN_VALUE+(byte)1;
-    private static int  CATEGORICAL_2 = Integer.MIN_VALUE+1;
+    private static byte CATEGORICAL_1 = Byte.MIN_VALUE;
+    private static int  CATEGORICAL_2 = Integer.MIN_VALUE;
 
     public void addCategorical() {
       if(_vals1 == null && _vals4 == null) alloc_data(_c);
@@ -133,7 +134,7 @@ public class NewChunk extends Chunk {
         int len = _c == _vals1.length?_vals1.length*2:_vals1.length;
         _vals4 = MemoryManager.malloc4(len);
         for(int j = 0; j < _c; ++j)
-          _vals4[j] = _vals1[j] == Byte.MIN_VALUE?Integer.MIN_VALUE:_vals1[j];
+          _vals4[j] = _vals1[j] == NA_1?NA_4:_vals1[j];
         _vals1 = null;
       }
       if(_vals4 != null) {
@@ -145,7 +146,7 @@ public class NewChunk extends Chunk {
         int len = _c == _vals4.length?_vals4.length*2:_vals4.length;
         _vals8 = MemoryManager.malloc8(len);
         for(int j = 0; j < _c; ++j)
-          _vals8[j] = _vals4[j] == Integer.MIN_VALUE?Long.MIN_VALUE:_vals4[j];
+          _vals8[j] = _vals4[j] == NA_4?NA_8:_vals4[j];
         _vals4 = null;
       }
       setRaw(l,idx);
@@ -153,11 +154,11 @@ public class NewChunk extends Chunk {
     public long get(int id) {
       if(_vals1 != null) {
         long l = _vals1[id];
-        return (l == Byte.MIN_VALUE)?Long.MIN_VALUE:l;
+        return (l == NA_1)?NA_8:l;
       }
       if(_vals4 != null) {
         long l = _vals4[id];
-        return (l == Integer.MIN_VALUE)?Long.MIN_VALUE:l;
+        return (l == NA_4)?NA_8:l;
       }
       return _vals8[id];
     }
@@ -168,10 +169,10 @@ public class NewChunk extends Chunk {
       if(_c > 0) {
         if(_vals1 != null)
           for(int i = 0; i < _c; ++i)
-            _vals8[i] = _vals1[i] == Byte.MIN_VALUE?Long.MIN_VALUE:_vals1[i];
+            _vals8[i] = _vals1[i] == NA_1?NA_8:_vals1[i];
         else if(_vals4 != null) {
           for(int i = 0; i < _c; ++i)
-            _vals8[i] = _vals4[i] == Integer.MIN_VALUE?Long.MIN_VALUE:_vals4[i];
+            _vals8[i] = _vals4[i] == NA_4?NA_8:_vals4[i];
         }
       }
     }
@@ -179,7 +180,7 @@ public class NewChunk extends Chunk {
     private void setRaw(byte b, int idx) {
       while(idx == _vals1.length)
         _vals1 = Arrays.copyOf(_vals1,_vals1.length*2);
-      if(_vals1[idx] == Byte.MIN_VALUE)--_nas;
+      if(_vals1[idx] == NA_1)--_nas;
       if(_vals1[idx] == 0)
         _nzs += (b == 0)?0:1;
       else
@@ -190,7 +191,7 @@ public class NewChunk extends Chunk {
     private void setRaw(int i, int idx) {
       while(idx >= _vals4.length)
         _vals4 = Arrays.copyOf(_vals4,_vals4.length*2);
-      if(_vals4[idx] == Integer.MIN_VALUE)--_nas;
+      if(_vals4[idx] == NA_4)--_nas;
       if(_vals4[idx] == 0)
         _nzs += (i == 0)?0:1;
       else
@@ -201,7 +202,7 @@ public class NewChunk extends Chunk {
     private void setRaw(long l, int idx) {
       while(idx >= _vals8.length)
         _vals8 = Arrays.copyOf(_vals8,_vals8.length*2);
-      if(_vals8[idx] == Long.MIN_VALUE)--_nas;
+      if(_vals8[idx] == NA_8)--_nas;
       if(_vals8[idx] == 0)
         _nzs += (l == 0)?0:1;
       else
@@ -212,21 +213,21 @@ public class NewChunk extends Chunk {
 
     public void setNA(int i) {
       if (_vals1 != null) {
-        if (_vals1[i] != Byte.MIN_VALUE) {
+        if (_vals1[i] != NA_1) {
           if(_vals1[i] == 0) ++_nzs;
-          _vals1[i] = Byte.MIN_VALUE;
+          _vals1[i] = NA_1;
           ++_nas;
         }
       } else if (_vals4 != null) {
-        if (_vals4[i] != Integer.MIN_VALUE) {
+        if (_vals4[i] != NA_4) {
           if(_vals4[i] == 0) ++_nzs;
-          _vals4[i] = Integer.MIN_VALUE;
+          _vals4[i] = NA_4;
           ++_nas;
         }
       } else {
-        if(_vals8[i] != C8Chunk._NA) {
+        if(_vals8[i] != NA_8) {
           if(_vals8[i] == 0) ++_nzs;
-          _vals8[i] = Long.MIN_VALUE;
+          _vals8[i] = NA_8;
           ++_nas;
         }
       }
@@ -236,9 +237,9 @@ public class NewChunk extends Chunk {
     public void addNA() {
       _nas++;
       int idx = _c;
-      if(_vals1 != null) setRaw(Byte.MIN_VALUE,idx);
-      else if(_vals4 != null) setRaw(Integer.MIN_VALUE,idx);
-      else setRaw(Long.MIN_VALUE,idx);
+      if(_vals1 != null) setRaw(NA_1,idx);
+      else if(_vals4 != null) setRaw(NA_4,idx);
+      else setRaw(NA_8,idx);
     }
 
     public void move(int to, int from) {
@@ -252,6 +253,17 @@ public class NewChunk extends Chunk {
 
     public int len() {
       return _vals1 != null?_vals1.length:_vals4 != null?_vals4.length:_vals8.length;
+    }
+
+    final byte NA_1 = Byte.MIN_VALUE;
+    final int  NA_4 = Integer.MIN_VALUE;
+    final long NA_8 = Long.MIN_VALUE;
+
+    public boolean isNA(int idx) {
+      if(_vals1 != null) return _vals1[idx] == NA_1;
+      if(_vals4 != null) return _vals4[idx] == NA_4;
+      if(_vals8 != null) return _vals8[idx] == NA_8;
+      throw new IllegalStateException();
     }
   }
 
@@ -505,10 +517,10 @@ public class NewChunk extends Chunk {
   protected final boolean isNA2(int idx) {
     if (isUUID()) return _ms.get(idx)==C16Chunk._LO_NA && Double.doubleToRawLongBits(_ds[idx])==C16Chunk._HI_NA;
     if (isString()) return _is[idx] == -1;
-    return (_ds == null) ? (_ms.get(idx) == Long.MIN_VALUE) : Double.isNaN(_ds[idx]);
+    return (_ds == null) ? _ms.isNA(idx) : Double.isNaN(_ds[idx]);
   }
   protected final boolean isCategorical2(int idx) {
-    return _xs!=null && _xs.get(idx)==Integer.MIN_VALUE+1;
+    return _xs!=null && _xs.isCategorical(idx);
   }
   protected final boolean isCategorical(int idx) {
     if(_id == null)return isCategorical2(idx);
