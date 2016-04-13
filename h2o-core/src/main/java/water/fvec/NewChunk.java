@@ -135,7 +135,7 @@ public class NewChunk extends Chunk {
       if(_vals1 != null) { // check if we fit withing single byte
         byte b = (byte)l;
         if(b == l && b != NA_1) {
-          old = setRaw(b,idx);
+          old = setRaw(idx,b);
         } else {
           int i = (int)l;
           if(i == l && i != NA_4) {
@@ -156,7 +156,8 @@ public class NewChunk extends Chunk {
       } else
         old = setRaw(idx,l);
       if (old != l) {
-        if (l == 0) ++_nzs;
+        if (old == 0) ++_nzs;
+        else if(l == 0) --_nzs;
         else if (l == NA_1)
           --_nas;
       }
@@ -175,25 +176,32 @@ public class NewChunk extends Chunk {
     }
 
     public void switchToInts() {
-      int len = Math.max(_vals1 == null?0:_vals1.length,_vals4 == null?0:_vals4.length);
+      int len = _vals1.length;
+      if(len < _c) len *= 2;
       _vals4 = MemoryManager.malloc4(len);
       if(_c > 0)
-        for(int i = 0; i < _c; ++i)
-          _vals8[i] = _vals1[i] == NA_1?NA_8:_vals1[i];
+        for(int i = 0; i < Math.min(_vals1.length,_c); ++i)
+          _vals4[i] = _vals1[i] == NA_1?NA_4:_vals1[i];
+      _vals1 = null;
     }
 
     public void switchToLongs() {
       int len = Math.max(_vals1 == null?0:_vals1.length,_vals4 == null?0:_vals4.length);
-      _vals8 = MemoryManager.malloc8(len);
+      int newlen = len;
+      if(len < _c) newlen *= 2;
+      _vals8 = MemoryManager.malloc8(newlen);
+      int n = Math.min(_c,len);
       if(_c > 0) {
         if(_vals1 != null)
-          for(int i = 0; i < _c; ++i)
+          for(int i = 0; i < n; ++i)
             _vals8[i] = _vals1[i] == NA_1?NA_8:_vals1[i];
         else if(_vals4 != null) {
-          for(int i = 0; i < _c; ++i)
+          for(int i = 0; i < n; ++i)
             _vals8[i] = _vals4[i] == NA_4?NA_8:_vals4[i];
         }
       }
+      _vals1 = null;
+      _vals4 = null;
     }
 
     private byte setRaw(int idx, byte val) {
@@ -202,6 +210,7 @@ public class NewChunk extends Chunk {
       byte old = _vals1[idx];
       _vals1[idx] = val;
       if(_c <= idx) _c = idx+1;
+      assert _c <= _vals1.length;
       return old;
     }
     private int setRaw(int idx, int val) {
@@ -227,6 +236,7 @@ public class NewChunk extends Chunk {
         byte old = setRaw(i,NA_1);
         if (old != NA_1) ++_nas;
         if(old == 0) ++_nzs;
+        assert _c <= _vals1.length;
       } else if (_vals4 != null) {
         int old = setRaw(i,NA_4);
         if (old != NA_4) ++_nas;
@@ -236,6 +246,7 @@ public class NewChunk extends Chunk {
         if (old != NA_8) ++_nas;
         if (old == 0) ++_nzs;
       }
+
     }
 
     public void addNA() {setNA(_c);}
@@ -1032,7 +1043,6 @@ public class NewChunk extends Chunk {
     set_sparseLen(num_noncompressibles);
     if (_ms != null) {
       _ms._c = num_noncompressibles;
-
       assert _sparseNA || _ms._nzs == num_noncompressibles:"nzs = " + _ms._nzs + ", non-compressibles = " + num_noncompressibles;
       assert !_sparseNA || _ms._nas == (_len - num_noncompressibles):"nas = " + _ms._nas + ", non-compressibles = " + num_noncompressibles + ", len = " + _len;
     }
@@ -1057,6 +1067,8 @@ public class NewChunk extends Chunk {
       } else if(_ds == null){
         Exponents xs = new Exponents(_len);
         Mantissas ms = new Mantissas(_len);
+        xs._c = _len;
+        ms._c = _len;
         if (_sparseNA) {
           for(int i = 0; i < _len; ++i) {
             ms.addNA();
@@ -1066,8 +1078,6 @@ public class NewChunk extends Chunk {
           xs.set(_id[i],_xs.get(i));
           ms.set(_id[i],_ms.get(i));
         }
-        xs._c = _len;
-        ms._c = _len;
         ms._nzs = _ms._nzs;
         _xs = xs;
         _ms = ms;
