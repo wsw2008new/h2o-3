@@ -130,17 +130,18 @@ public class NewChunk extends Chunk {
 
     public void set(int idx, long l) {
       if(idx > _c) throw new IndexOutOfBoundsException();
-      if(l == NA_8) throw new IllegalArgumentException("can not store " + l + ", value reserved for missing");
       long old;
       if(_vals1 != null) { // check if we fit withing single byte
         byte b = (byte)l;
         if(b == l && b != NA_1) {
           old = setRaw(idx,b);
+          if(old == NA_1) old = NA_8;
         } else {
           int i = (int)l;
           if(i == l && i != NA_4) {
             switchToInts();
             old = setRaw(idx,i);
+            if(old == NA_4) old = NA_8;
           } else {
             switchToLongs();
             old = setRaw(idx,l);
@@ -151,6 +152,7 @@ public class NewChunk extends Chunk {
         if(i != l || i == NA_4) {
           switchToLongs();
           old = setRaw(idx,l);
+          if(old == NA_4) old = NA_8;
         } else
           old = setRaw(idx,i);
       } else
@@ -158,7 +160,7 @@ public class NewChunk extends Chunk {
       if (old != l) {
         if (old == 0) ++_nzs;
         else if(l == 0) --_nzs;
-        else if (l == NA_1)
+        else if (l == NA_8)
           --_nas;
       }
     }
