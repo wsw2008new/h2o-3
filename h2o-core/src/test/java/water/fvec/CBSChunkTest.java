@@ -27,6 +27,9 @@ public class CBSChunkTest extends TestUtil {
     AppendableVec av = new AppendableVec(Vec.newKey(), Vec.T_NUM);
     // Create a new chunk
     NewChunk nc = new NewChunk(av,0, ls, xs, null, null);
+    for(int i = 0; i < ls.length; ++i)
+      if(ls[i] == Long.MIN_VALUE)
+        nc.setNA_impl(i);
     nc.type();                  // Compute rollups, including NA
     assertEquals(expNA, nc.naCnt());
     // Compress chunk

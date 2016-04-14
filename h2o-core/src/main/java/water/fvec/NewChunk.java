@@ -219,10 +219,10 @@ public class NewChunk extends Chunk {
     return _ds = MemoryManager.malloc8d(l);
   }
   int   [] alloc_str_indices(int l) {
-    if(_ms != null && _sparseLen == 0) {
-      _ms = null;
-      _xs = null;
-    }
+    _ms = null;
+    _xs = null;
+    _missing = null;
+    _ds = null;
     return _is = MemoryManager.malloc4(l);
   }
 
@@ -334,7 +334,7 @@ public class NewChunk extends Chunk {
       if (isNA2(i)) c.addNA();
       else c.addNum(_ms.get(i),_xs.get(i));
     } else {
-      if (_ms != null) {
+      if (isUUID()) {
         c.addUUID(_ms.get(i), Double.doubleToRawLongBits(_ds[i]));
       } else if (_ss != null) {
         int sidx = _is[i];
