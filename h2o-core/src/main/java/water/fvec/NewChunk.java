@@ -203,9 +203,9 @@ public class NewChunk extends Chunk {
   // Sparse: if _sparseLen != _len, then _ls/_ds are compressed to non-zero's only,
   // and _xs is the row number.  Still _len is count of elements including
   // zeros, and _sparseLen is count of non-zeros.
-  private transient Mantissas _ms;   // Mantissa
-  private transient BitSet   _missing = new BitSet();
-  private transient Exponents _xs;   // Exponent, or if _ls==0, NA or Categorical or Rows
+  protected transient Mantissas _ms;   // Mantissa
+  protected transient BitSet   _missing;
+  protected transient Exponents _xs;   // Exponent, or if _ls==0, NA or Categorical or Rows
   private transient int    _id[];   // Indices (row numbers) of stored values, used for sparse
   private transient double _ds[];   // Doubles, for inflating via doubles
   public transient byte[]   _ss;   // Bytes of appended strings, including trailing 0
@@ -440,7 +440,7 @@ public class NewChunk extends Chunk {
   //what about sparse reps?
   protected final boolean isNA2(int idx) {
     if (isString()) return _is[idx] == -1;
-    if(isUUID() || _ds == null) return _missing.get(idx);
+    if(isUUID() || _ds == null) return _missing != null && _missing.get(idx);
     return Double.isNaN(_ds[idx]);
   }
   protected final boolean isCategorical2(int idx) {
@@ -467,6 +467,7 @@ public class NewChunk extends Chunk {
         addStr(null);
         return;
       } else if (isUUID()) {
+        if(_missing == null) _missing = new BitSet();
         _missing.set(_sparseLen);
         _ds[_sparseLen] = Double.NaN;
         ++_sparseLen;
@@ -478,6 +479,7 @@ public class NewChunk extends Chunk {
         if (!_sparseNA && _sparseLen == _ms.len())
           append2slow();
         if(!_sparseNA) {
+          if(_missing == null) _missing = new BitSet();
           _missing.set(_sparseLen);
           if (_id != null) _id[_sparseLen] = _len;
           ++_sparseLen;
@@ -805,8 +807,8 @@ public class NewChunk extends Chunk {
     assert _ds==null;
     if(_ms != null && _sparseLen > 0){
       if(_id == null) { // check for sparseness
-        int nzs = _ms._nzs + _missing.cardinality();
-        int nonnas = _sparseLen - _missing.cardinality();
+        int nzs = _ms._nzs + (_missing != null?_missing.cardinality():0);
+        int nonnas = _sparseLen - ((_missing != null)?_missing.cardinality():0);
         if((nonnas+1)*_sparseRatio < _len) {
           set_sparse(nonnas,Compress.NA);
           assert _id.length == _ms.len():"id.len = " + _id.length + ", ms.len = " + _ms.len();
@@ -867,48 +869,7 @@ public class NewChunk extends Chunk {
       _sparseNA = true;
     }
     if (_id != null && _sparseLen == num_noncompressibles && _len != 0) return;
-    if (_id != null) { // we have sparse representation but some compressible elements in it!
-      // can happen when setting a non-compressible element to a compressible one on sparse chunk
-      int[] id = MemoryManager.malloc4(num_noncompressibles);
-      int j = 0;
-      if (_ds != null) {
-        double[] ds = MemoryManager.malloc8d(num_noncompressibles);
-        for (int i = 0; i < _sparseLen; ++i) {
-          if (!is_compressible(_ds[i])) {
-            ds[j] = _ds[i];
-            id[j] = _id[i];
-            ++j;
-          }
-        }
-        _ds = ds;
-      } else if (_is != null) {
-        int[] is = MemoryManager.malloc4(num_noncompressibles);
-        for (int i = 0; i < _sparseLen; i++) {
-          if (_is[i] != -1) { //same test for NA sparse and 0 sparse
-            is[j] = _is[i];
-            id[j] = _id[i];
-            ++j;
-          }
-        }
-      } else {
-        Mantissas ms = new Mantissas(num_noncompressibles);
-        Exponents xs = new Exponents(num_noncompressibles);
-        for (int i = 0; i < _sparseLen; ++i) {
-          if (!is_compressible(i)) {
-            ms.set(i,_ms.get(i));
-            xs.set(i,_xs.get(i));
-            id[j] = _id[i];
-            ++j;
-          }
-        }
-        _ms = ms;
-        _xs = xs;
-      }
-      _id = id;
-      assert j == num_noncompressibles;
-      set_sparseLen(num_noncompressibles);
-      return;
-    }
+    if (_id != null) cancel_sparse();
     assert _sparseLen == _len : "_sparseLen = " + _sparseLen + ", _len = " + _len + ", num_noncompressibles = " + num_noncompressibles;
     int cs = 0; //number of compressibles
     if (_is != null) {
@@ -934,10 +895,11 @@ public class NewChunk extends Chunk {
         for (int i = 0; i < _sparseLen; ++i) {
           if (is_compressible(i)) {
             ++cs;
-          } else {
+          } else  {
             _ms.move(i - cs, i);
             _xs.move(i - cs, i);
             _id[i - cs] = i;
+            if(sparsity_type != Compress.NA && _missing != null)_missing.set(i-cs,_missing.get(i));
           }
         }
       }
@@ -964,7 +926,7 @@ public class NewChunk extends Chunk {
   }
   
   private boolean is_compressible(int x) {
-    return _sparseNA ? isNA2(x):_ms.get(x) == 0;
+    return isNA2(x)?_sparseNA:!_sparseNA &&_ms.get(x) == 0;
   }
   
   public void cancel_sparse(){
@@ -977,12 +939,12 @@ public class NewChunk extends Chunk {
       } else if(_ds == null){
         Exponents xs = new Exponents(_len);
         Mantissas ms = new Mantissas(_len);
-        BitSet missing = new BitSet();
+        BitSet missing = (_missing != null || _sparseNA)?new BitSet():null;
         if(_sparseNA)missing.set(0,_len);
         for(int i = 0; i < _sparseLen; ++i){
           xs.set(_id[i],_xs.get(i));
           ms.set(_id[i],_ms.get(i));
-          missing.set(_id[i],_sparseNA?false:_missing.get(i));
+          if(!_sparseNA && missing != null)missing.set(_id[i],_missing.get(i));
         }
         ms._nzs = _ms._nzs;
         _xs = xs;
@@ -1480,7 +1442,7 @@ public class NewChunk extends Chunk {
     }
     _ms.set(i,l);
     _xs.set(i,0);
-    _missing.clear(i);
+    if(_missing != null)_missing.clear(i);
     _naCnt = -1;
     return true;
   }
@@ -1526,8 +1488,17 @@ public class NewChunk extends Chunk {
   }
 
   protected final boolean setNA_impl2(int i) {
-    if(_ds != null) _ds[i] = Double.NaN;
-    else _missing.set(i);
+    if(!isUUID() && _ds != null) {
+      _ds[i] = Double.NaN;
+      return true;
+    }
+    if(isString()) {
+      _is[i] = -1;
+      return true;
+    }
+    if(_missing == null) _missing = new BitSet();
+    _missing.set(i);
+    _ms.set(i,0); // do not double count non-zeros
     _naCnt = -1;
     return true;
   }
