@@ -170,65 +170,6 @@ public class NewChunkTest extends TestUtil {
     testIntegerChunk(ms4,4);
     testIntegerChunk(ms8,8);
   }
-  @Test public void testSetSparse(){
-    Vec v = Vec.makeCon(0,0);
-    NewChunk nc;
-    Chunk c;
-    // test set sparse and set sparse NA
-    nc = new NewChunkTestCpy(v,4);
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i)
-      nc.addNum(i,0);
-    nc.addNA();
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i) {
-      if(i % 10 != 0) // keep only 10 %
-        nc.set_impl(i - Byte.MIN_VALUE, 0);
-    }
-    c = nc.compress();
-    assertTrue(c.isNA(255));
-    int [] nonnas = new int[c.sparseLenZero()];
-    c.nonzeros(nonnas);
-    for(int i = 0; i < c.sparseLenZero(); ++i)
-      System.out.println(i + ": " + nonnas[i] + ", " + c.atd(nonnas[i]));
-    assertEquals(25,c.sparseLenZero());
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i)
-      if(i % 10 == 0)
-        assertEquals(i,c.at8(i - Byte.MIN_VALUE));
-
-    nc = new NewChunkTestCpy(v,4);
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i)
-      nc.addNum(i,0);
-    nc.addNA();
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i) {
-      if(i % 10 != 0) // keep only 10 %
-        nc.setNA_impl(i - Byte.MIN_VALUE);
-    }
-    c = nc.compress();
-    assertEquals(25,c.sparseLenNA());
-    nonnas = new int[c.sparseLenNA()];
-    c.nonnas(nonnas);
-    for(int i = 0; i < c.sparseLenNA(); ++i)
-      System.out.println(i + ": " + nonnas[i] + ", " + c.atd(nonnas[i]));
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i)
-      if(i % 10 == 0)
-        assertEquals(i,c.at8(i - Byte.MIN_VALUE));
-
-    nc = new NewChunkTestCpy(v,4);
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i)
-      nc.addNum(i,i);
-    nc.addNA();
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i) {
-      if(i % 10 != 0) // keep only 10 %
-        nc.set_impl(i - Byte.MIN_VALUE, 0);
-    }
-    c = nc.compress();
-    assertEquals(25,c.sparseLenZero());
-    for(int i = Byte.MIN_VALUE; i < Byte.MAX_VALUE; ++i)
-      if(i % 10 == 0)
-        assertEquals(i*Math.pow(10,i),c.atd(i - Byte.MIN_VALUE),1e-8);
-    v.remove();
-  }
-
-
 
   @Test public void testSparseDoubles2(){
     NewChunk nc = new NewChunk(null, 0, true);

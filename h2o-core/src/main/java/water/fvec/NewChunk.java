@@ -467,14 +467,15 @@ public class NewChunk extends Chunk {
         addStr(null);
         return;
       } else if (isUUID()) {
+        if( _ms==null || _ds== null || _sparseLen >= _ms.len() )
+          append2slowUUID();
         if(_missing == null) _missing = new BitSet();
         _missing.set(_sparseLen);
         _ds[_sparseLen] = Double.NaN;
         ++_sparseLen;
       } else if (_ds != null) {
-        _ds[_sparseLen] = Double.NaN;
-        if (_id != null) _id[_sparseLen] = _len;
-        ++_sparseLen;
+        addNum(Double.NaN);
+        return;
       } else {
         if (!_sparseNA && _sparseLen == _ms.len())
           append2slow();
@@ -1377,7 +1378,7 @@ public class NewChunk extends Chunk {
     for( int i = 0; i < _len; ++i ) {
       long lo = 0, hi=0;
       if( _id == null || _id.length == 0 || (j < _id.length && _id[j] == i ) ) {
-        if(_missing.get(j)) {
+        if(_missing != null && _missing.get(j)) {
           lo = C16Chunk._LO_NA;
           hi = C16Chunk._HI_NA;
         } else {
