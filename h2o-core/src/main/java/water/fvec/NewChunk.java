@@ -25,6 +25,9 @@ public class NewChunk extends Chunk {
   public void alloc_nums(int len) { _ms = new Mantissas(len); _xs = new Exponents(len);}
 
 
+  /**
+   * Wrapper around exponent, stores values (only if there are non-zero exponents) in bytes or ints.
+   */
   public static class Exponents {
     int _len;
     public Exponents(int cap){_len = cap;}
@@ -96,6 +99,11 @@ public class NewChunk extends Chunk {
     }
   }
 
+  /**
+   * Class wrapping around mantissa.
+   * Stores values in bytes, ints or longs, if data fits.
+   * Sets and gets done in longs.
+   */
   public static class Mantissas {
     byte [] _vals1;
     int  [] _vals4;
@@ -329,25 +337,26 @@ public class NewChunk extends Chunk {
 
   private transient BufferedString _bfstr = new BufferedString();
 
-  private void add2Chunk_impl(NewChunk c, int i){
-    if (_ds == null && _ss == null) {
-      if (isNA2(i)) c.addNA();
-      else c.addNum(_ms.get(i),_xs.get(i));
-    } else {
-      if (isUUID()) {
-        c.addUUID(_ms.get(i), Double.doubleToRawLongBits(_ds[i]));
-      } else if (_ss != null) {
-        int sidx = _is[i];
-        int nextNotNAIdx = i+1;
-        // Find next not-NA value (_is[idx] != -1)
-        while (nextNotNAIdx < _is.length && _is[nextNotNAIdx] == -1) nextNotNAIdx++;
-        int slen = nextNotNAIdx < _is.length ? _is[nextNotNAIdx]-sidx : _sslen - sidx;
-        // null-BufferedString represents NA value
-        BufferedString bStr = sidx == -1 ? null : _bfstr.set(_ss, sidx, slen);
-        c.addStr(bStr);
-      } else
-        c.addNum(_ds[i]);
-    }
+  private void add2Chunk_impl(NewChunk c, int i) {
+    if (isNA2(i)) {
+      c.addNA();
+    } else  if (isUUID()) {
+      c.addUUID(_ms.get(i), Double.doubleToRawLongBits(_ds[i]));
+    } else if(_ms != null) {
+      c.addNum(_ms.get(i), _xs.get(i));
+    } else if(_ds != null) {
+      c.addNum(_ds[i]);
+    } else if (_ss != null) {
+      int sidx = _is[i];
+      int nextNotNAIdx = i + 1;
+      // Find next not-NA value (_is[idx] != -1)
+      while (nextNotNAIdx < _is.length && _is[nextNotNAIdx] == -1) nextNotNAIdx++;
+      int slen = nextNotNAIdx < _is.length ? _is[nextNotNAIdx] - sidx : _sslen - sidx;
+      // null-BufferedString represents NA value
+      BufferedString bStr = sidx == -1 ? null : _bfstr.set(_ss, sidx, slen);
+      c.addStr(bStr);
+    } else
+      throw new IllegalStateException();
   }
   public void add2Chunk(NewChunk c, int i){
     if(!isSparseNA() && !isSparseZero())
@@ -471,6 +480,7 @@ public class NewChunk extends Chunk {
           append2slowUUID();
         if(_missing == null) _missing = new BitSet();
         _missing.set(_sparseLen);
+        if (_id != null) _id[_sparseLen] = _len;
         _ds[_sparseLen] = Double.NaN;
         ++_sparseLen;
       } else if (_ds != null) {
@@ -491,8 +501,9 @@ public class NewChunk extends Chunk {
   }
 
   public void addNum (long val, int exp) {
-    if( isUUID() || isString() ) addNA();
-    else if(_ds != null) {
+    if( isUUID() || isString() ) {
+      addNA();
+    } else if(_ds != null) {
       assert _ms == null;
       addNum(val*PrettyPrint.pow10(exp));
     } else {
@@ -870,7 +881,8 @@ public class NewChunk extends Chunk {
       _sparseNA = true;
     }
     if (_id != null && _sparseLen == num_noncompressibles && _len != 0) return;
-    if (_id != null) cancel_sparse();
+    if (_id != null)
+      cancel_sparse();
     assert _sparseLen == _len : "_sparseLen = " + _sparseLen + ", _len = " + _len + ", num_noncompressibles = " + num_noncompressibles;
     int cs = 0; //number of compressibles
     if (_is != null) {
@@ -892,7 +904,7 @@ public class NewChunk extends Chunk {
         return;
       } else {
         assert num_noncompressibles <= _sparseLen;
-        _id = alloc_indices(_ms.len());
+        _id = MemoryManager.malloc4(_ms.len());
         for (int i = 0; i < _sparseLen; ++i) {
           if (is_compressible(i)) {
             ++cs;
@@ -909,7 +921,7 @@ public class NewChunk extends Chunk {
       _id = alloc_indices(_ds.length);
       for (int i = 0; i < _sparseLen; ++i) {
         if (is_compressible(_ds[i])) ++cs;
-        else if(cs > 0){
+        else {
           _ds[i - cs] = _ds[i];
           _id[i - cs] = i;
         }
