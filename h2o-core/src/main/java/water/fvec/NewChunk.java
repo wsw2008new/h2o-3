@@ -1461,7 +1461,9 @@ public class NewChunk extends Chunk {
   }
 
   @Override public boolean set_impl(int i, double d) {
-    if(_ds == null){
+    if(_ds == null && (long)d == d)
+      return set_impl(i,(long)d);
+    if(_ds == null) {
       if (_is == null) { //not a string
         assert _sparseLen == 0 || _ms != null;
         switch_to_doubles();

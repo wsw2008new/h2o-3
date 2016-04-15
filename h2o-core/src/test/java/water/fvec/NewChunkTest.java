@@ -172,16 +172,35 @@ public class NewChunkTest extends TestUtil {
   }
 
   @Test public void testSparseDoubles2(){
-    NewChunk nc = new NewChunk(null, 0, true);
+    NewChunk nc = new NewChunk(null, 0, false);
     int N = 1000;
     nc.addZeros(N);
     nc.addNum(Math.PI);
     nc.addZeros(N);
+    nc.addNum(Math.E);
     Chunk c = nc.compress();
     int i=0;
     for(;i<N;)     assertEquals(0,c.atd(i++),1e-16);
+    assertEquals(i,c.nextNZ(-1));
     assertEquals(         Math.PI,c.atd(i++),1e-16);
     for(;i<2*N+1;) assertEquals(0,c.atd(i++),1e-16);
+    assertEquals(i,c.nextNZ(c.nextNZ(-1)));
+    assertEquals(         Math.E,c.atd(i++),1e-16);
+
+    nc = new NewChunk(null, 0, false);
+    nc.addNum(Math.PI);
+    nc.addNum(Double.MAX_VALUE);
+    nc.addNum(Double.MIN_VALUE);
+    nc.addZeros(5);
+    nc.addNum(Math.E);
+    nc.addZeros(1000000);
+    c = nc.compress();
+    assertEquals(0,c.nextNZ(-1));
+    assertEquals(1,c.nextNZ(0));
+    assertEquals(2,c.nextNZ(1));
+    assertEquals(8,c.nextNZ(2));
+    assertEquals(c.atd(0), Math.PI,1e-16);
+    assertEquals(c.atd(8), Math.E,1e-16);
   }
   /**
    * Constant Double Chunk - C0DChunk
