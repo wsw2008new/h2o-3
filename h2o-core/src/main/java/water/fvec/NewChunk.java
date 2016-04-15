@@ -958,19 +958,17 @@ public class NewChunk extends Chunk {
       } else if(_ds == null) {
         Exponents xs = new Exponents(_len);
         Mantissas ms = new Mantissas(_len);
-        if(_sparseNA) {
-          _missing = new BitSet();
-          _missing.set(0,_len);
-        } else if(_missing != null) {
-          _missing.clear();
-        }
+        BitSet missing = new BitSet();
+        if(_sparseNA)
+          missing.set(0,_len);
         for (int i = 0; i < _sparseLen; ++i) {
           xs.set(_id[i], _xs.get(i));
           ms.set(_id[i], _ms.get(i));
-          if (_missing != null) _missing.set(_id[i], _sparseNA?false:_missing.get(i));
+          missing.set(_id[i], _sparseNA || _missing == null?false:_missing.get(i));
         }
         ms._nzs = _ms._nzs;
         _xs = xs;
+        _missing = missing;
         _ms = ms;
       } else {
         double [] ds = MemoryManager.malloc8d(_len);
