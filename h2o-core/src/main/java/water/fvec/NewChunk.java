@@ -955,20 +955,23 @@ public class NewChunk extends Chunk {
         Arrays.fill(is, -1);
         for (int i = 0; i < _sparseLen; i++) is[_id[i]] = _is[i];
         _is = is;
-      } else if(_ds == null){
+      } else if(_ds == null) {
         Exponents xs = new Exponents(_len);
         Mantissas ms = new Mantissas(_len);
-        BitSet missing = (_missing != null || _sparseNA)?new BitSet():null;
-        if(_sparseNA)missing.set(0,_len);
-        for(int i = 0; i < _sparseLen; ++i){
-          xs.set(_id[i],_xs.get(i));
-          ms.set(_id[i],_ms.get(i));
-          if(!_sparseNA && missing != null)missing.set(_id[i],_missing.get(i));
+        if(_sparseNA) {
+          _missing = new BitSet();
+          _missing.set(0,_len);
+        } else if(_missing != null) {
+          _missing.clear();
+        }
+        for (int i = 0; i < _sparseLen; ++i) {
+          xs.set(_id[i], _xs.get(i));
+          ms.set(_id[i], _ms.get(i));
+          if (_missing != null) _missing.set(_id[i], _sparseNA?false:_missing.get(i));
         }
         ms._nzs = _ms._nzs;
         _xs = xs;
         _ms = ms;
-        _missing = missing;
       } else {
         double [] ds = MemoryManager.malloc8d(_len);
         _missing = new BitSet();
