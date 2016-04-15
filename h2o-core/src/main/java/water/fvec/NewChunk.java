@@ -508,24 +508,24 @@ public class NewChunk extends Chunk {
       addNum(val*PrettyPrint.pow10(exp));
     } else {
       if( val == 0 ) exp = 0;// Canonicalize zero
-      boolean predicate = _sparseNA ? (val != Long.MAX_VALUE || exp != Integer.MIN_VALUE): val != 0;
-      if(_id == null || predicate) {
-        if(_ms == null || _ms.len() == _sparseLen)
+      if(val != 0 || !isSparseZero()) {
+        if (_ms == null || _ms.len() == _sparseLen) {
           append2slow();
+          addNum(val, exp); // sparsity could've changed
+          return;
+        }
         int len = _ms.len();
         int slen = _sparseLen;
-        if(_id == null || predicate) {
-          long t;                // Remove extra scaling
-          while (exp < 0 && exp > -9999999 && (t = val / 10) * 10 == val) {
-            val = t;
-            exp++;
-          }
-          _ms.set(_sparseLen,val);
-          _xs.set(_sparseLen,exp);
-          assert _id == null || _id.length == _ms.len():"id.len = " + _id.length + ", ms.len = " + _ms.len() +", old ms.len = " + len + ", sparseLen = " + slen;
-          if(_id != null)_id[_sparseLen] = _len;
-          _sparseLen++;
+        long t;                // Remove extra scaling
+        while (exp < 0 && exp > -9999999 && (t = val / 10) * 10 == val) {
+          val = t;
+          exp++;
         }
+        _ms.set(_sparseLen, val);
+        _xs.set(_sparseLen, exp);
+        assert _id == null || _id.length == _ms.len() : "id.len = " + _id.length + ", ms.len = " + _ms.len() + ", old ms.len = " + len + ", sparseLen = " + slen;
+        if (_id != null) _id[_sparseLen] = _len;
+        _sparseLen++;
       }
       _len++;
     }
@@ -533,11 +533,17 @@ public class NewChunk extends Chunk {
   // Fast-path append double data
   public void addNum(double d) {
     if( isUUID() || isString() ) { addNA(); return; }
-    boolean predicate = _sparseNA ? !Double.isNaN(d) : d != 0;
-    if(_id == null || predicate) {
-      if(_ms != null)switch_to_doubles();
+    boolean predicate = _sparseNA ? !Double.isNaN(d) : isSparseZero()?d != 0:true;
+    if(predicate) {
+      if(_ms != null) {
+        if((long)d == d){
+          addNum((long)d,0);
+          return;
+        }
+        switch_to_doubles();
+      }
       //if ds not big enough
-      if( _ds == null || _sparseLen >= _ds.length ) {
+      if(_sparseLen == _ds.length ) {
         append2slowd();
         // call addNum again since append2slowd might have flipped to sparse
         addNum(d);
