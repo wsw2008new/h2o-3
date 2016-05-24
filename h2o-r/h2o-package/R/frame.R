@@ -2009,13 +2009,11 @@ var <- function(x, y = NULL, na.rm = FALSE, use)  {
 #' }
 #' @export
 h2o.cor <- function(x, y=NULL){
-  symmetric <- FALSE
-  if( is.null(y) ) {
-    y <- x
-    symmetric <- TRUE
-  }
   # Eager, mostly to match prior semantics but no real reason it need to be
-  expr <- .newExpr("cor",x,y,symmetric)
+  if( is.null(y) ){
+    y <- x
+  }
+  expr <- .newExpr("cor",x,y)
   if( (nrow(x)==1L || (ncol(x)==1L && ncol(y)==1L)) ) .eval.scalar(expr)
   else .fetch.data(expr,ncol(x))
 }
