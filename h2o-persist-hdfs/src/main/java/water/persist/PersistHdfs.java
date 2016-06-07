@@ -42,7 +42,8 @@ public final class PersistHdfs extends Persist {
   private final Path _iceRoot;
 
   // Returns String with path for given key.
-  private static String getPathForKey(Key k) {
+ // private static String getPathForKey(Key k) {
+    +  public static String getPathForKey(Key k) {
     final int off = k._kb[0]==Key.CHK ? Vec.KEY_PREFIX_LEN : 0;
     return new String(k._kb,off,k._kb.length-off);
   }

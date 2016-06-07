@@ -2,10 +2,18 @@ package water.parser;
 
 import org.junit.*;
 
++import java.io.File;
+
 import water.*;
+
++import water.exceptions.H2ONotFoundArgumentException;
+
 import water.fvec.*;
 
 import static water.parser.DefaultParserProviders.CSV_INFO;
+
++import water.persist.PersistNFS;
++import water.util.Log;
 
 public class ParserTest2 extends TestUtil {
   @BeforeClass
@@ -72,7 +80,10 @@ public class ParserTest2 extends TestUtil {
                                               ar("'Tomas''s","test2'","test2",null),
                                               ar("last","'line''s","trailing","piece'") };
     Key k = ParserTest.makeByteVec(data);
-    ParseSetup gSetupF = ParseSetup.guessSetup(data[0].getBytes(), CSV_INFO, (byte)',', 4, false/*single quote*/, ParseSetup.NO_HEADER, null, null, null, null);
+//    ParseSetup gSetupF = ParseSetup.guessSetup(data[0].getBytes(), CSV_INFO, (byte)',', 4, false/*single quote*/, ParseSetup.NO_HEADER, null, null, null, null);
+
+   +    ParseSetup gSetupF = ParseSetup.guessSetup(null, data[0].getBytes(), ParserType.CSV, (byte) ',', 4, false/*single quote*/, ParseSetup.NO_HEADER, null, null, null, null);
+
     gSetupF._column_types = ParseSetup.strToColumnTypes(new String[]{"Enum", "Enum", "Enum", "Enum"});
     Frame frF = ParseDataset.parse(Key.make(), new Key[]{k}, false, gSetupF);
     testParsed(frF,expectFalse);
@@ -80,7 +91,10 @@ public class ParserTest2 extends TestUtil {
     String[][] expectTrue = new String[][] { ar("Tomass,test,first,line", null),
                                              ar("Tomas''stest2","test2"),
                                              ar("last", "lines trailing piece") };
-    ParseSetup gSetupT = ParseSetup.guessSetup(data[0].getBytes(), CSV_INFO, (byte)',', 2, true/*single quote*/, ParseSetup.NO_HEADER, null, null, null, null);
+//    ParseSetup gSetupT = ParseSetup.guessSetup(data[0].getBytes(), CSV_INFO, (byte)',', 2, true/*single quote*/, ParseSetup.NO_HEADER, null, null, null, null);
+   +    ParseSetup gSetupT = ParseSetup.guessSetup(null, data[0].getBytes(),ParserType.CSV, (byte)',', 2, true/*single quote*/, ParseSetup.NO_HEADER, null, null, null, null);
+
+
     gSetupT._column_types = ParseSetup.strToColumnTypes(new String[]{"Enum", "Enum", "Enum", "Enum"});
     Frame frT = ParseDataset.parse(Key.make(), new Key[]{k}, true, gSetupT);
     //testParsed(frT,expectTrue);  // not currently passing
@@ -234,4 +248,174 @@ public class ParserTest2 extends TestUtil {
     Key k = ParserTest.makeByteVec(data);
     ParserTest.testParsed(ParseDataset.parse(Key.make(), k),exp,33);
   }
+
+  +  @Test public void testOrcFileBasics() {
+    +    // Basic parsing of most data types (primitive and complex)
+            +    Frame fr = parseOrcFile("smalldata/parser/orc/orc-file-11-format.orc"); // v0.11, 7500r, 2 str, none
+    +    Assert.assertEquals(fr.numCols(),14);
+    +    Assert.assertEquals(fr.numRows(), 7500);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +
+            +    // Zlib compression and large stripe count (= large chunk count)
+                    +    fr = parseOrcFile("smalldata/parser/orc/demo-11-zlib.orc"); // v0.11, 1920800r, 385 str, zlib
+    +    Assert.assertEquals(fr.numCols(), 9);
+    +    Assert.assertEquals(fr.numRows(), 1920800);
+    +    fr.delete();
+    +
+            +    // Version 12 of ORC format, heavy Zlib compression, low stripe count
+                    +    fr = parseOrcFile("smalldata/parser/orc/demo-12-zlib.orc"); // v0.12, 1920800r, 385 str, zlib
+    +    Assert.assertEquals(fr.numCols(), 9);
+    +    Assert.assertEquals(fr.numRows(), 1920800);
+    +    fr.delete();
+    +
+            +
+                    +    // Version 12 of ORC format, Snappy compression, low stripe count
+                            +    fr = parseOrcFile("smalldata/parser/orc/TestOrcFile.testSnappy.orc"); // v0.12, 10000r, 2str, snappy
+    +    Assert.assertEquals(fr.numCols(), 2);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    fr.delete();
+    +
+            +    // Version 12 of ORC format, with Union data structure
+                    +    fr = parseOrcFile("smalldata/parser/orc/TestOrcFile.testUnionAndTimestamp.orc"); // 0.12, 5077, 2str, no compr
+    +    Assert.assertEquals(fr.numCols(), 3);
+    +    Assert.assertEquals(fr.numRows(), 5077);
+    +    fr.delete();
+    +  }
+  +
+          +  @Test public void testOrcFileDate() {
+    +    Frame fr = parseOrcFile("smalldata/parser/orc/TestOrcFile.testDate2038.orc");  // 0.12, 212000, 28, zlib
+    +    Assert.assertEquals(fr.numCols(), 2);
+    +    Assert.assertEquals(fr.numRows(), 212000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +
+            +    fr = parseOrcFile("smalldata/parser/orc/TestOrcFile.testDate1900.orc");  // 0.12, 212000, 28, zlib
+    +    Assert.assertEquals(fr.numCols(), 2);
+    +    Assert.assertEquals(fr.numRows(), 70000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +  }
+  +
+          +  @Test public void testOrcFilePrimitiveRootField() {
+    +    Frame fr = parseOrcFile("smalldata/parser/orc/TestOrcFile.testTimestamp.orc"); // 0.11, 12r, 1 stripe, zlib
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 12);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +    fr = parseOrcFile("smalldata/parser/orc/bool_single_col.orc"); // 0.12, 10000r, 2 stripe, snappy
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +    fr = parseOrcFile("smalldata/parser/orc/tinyint_single_col.orc"); // 0.12, 10000r, 2 stripe, snappy
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +    fr = parseOrcFile("smalldata/parser/orc/smallint_single_col.orc"); // 0.12, 10000r, 2 stripe, snappy
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +    fr = parseOrcFile("smalldata/parser/orc/int_single_col.orc"); // 0.12, 10000r, 2 stripe, snappy
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +    fr = parseOrcFile("smalldata/parser/orc/bigint_single_col.orc"); // 0.12, 10000r, 2 stripe, snappy
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +    fr = parseOrcFile("smalldata/parser/orc/float_single_col.orc"); // 0.12, 10000r, 2 stripe, snappy
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +    fr = parseOrcFile("smalldata/parser/orc/double_single_col.orc"); // 0.12, 10000r, 2 stripe, snappy
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +    fr = parseOrcFile("smalldata/parser/orc/string_single_col.orc"); // 0.12, 10000r, 2 stripe, snappy
+    +    Assert.assertEquals(fr.numCols(), 1);
+    +    Assert.assertEquals(fr.numRows(), 10000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +  }
+  +
+          +  @Test public void testOrcCornerCases() {
+    +    Frame fr = parseOrcFile("smalldata/parser/orc/TestOrcFile.emptyFile.orc"); // 0.12, 0r, 0s, no compr
+    +    Assert.assertEquals(fr.numCols(), 12);
+    +    Assert.assertEquals(fr.numRows(), 0);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +
+            +    fr = parseOrcFile("smalldata/parser/orc/nulls-at-end-snappy.orc"); // 0.12, 10000r, 2str, snappy
+    +    Assert.assertEquals(fr.numCols(), 7);
+    +    Assert.assertEquals(fr.numRows(), 70000);
+    +    // CHECK column types
+            +    // CHECK min, max, and mean
+                    +    fr.delete();
+    +  }
+  +
+          +  private Frame parseOrcFile(String path) {
+    +    try {
+      +      Log.info("\nTrying to parse " + path);
+      +      File f = new File(path);
+      +      if( !f.exists() ) throw new H2ONotFoundArgumentException("File " + path + " does not exist");
+      +      f = new File(f.getAbsolutePath());
+      +      Futures fs = new Futures();
+      +      Key fkey = PersistNFS.decodeFile(f);
+      +      new Frame(fkey).delete_and_lock((Key)null); // Lock before making the NFS; avoids racing ImportFiles creating same Frame
+      +      NFSFileVec nfs = NFSFileVec.make(f, fs);
+      +      new Frame(fkey, new String[]{"C1"}, new Vec[]{nfs}).update((Key)null).unlock((Key)null);
+      +      fs.blockForPending();
+      +      ParseSetup pSetup = new ParseSetup();
+      +      pSetup._parse_type = ParserType.GUESS;
+      +      pSetup = ParseSetup.guessSetup(new Key[] {fkey}, pSetup);
+      +      return ParseDataset.parse(Key.make(), new Key[] {fkey}, true, pSetup);
+      +    } catch (Throwable t) {
+      +      throw Log.throwErr(t);
+      +    }
+    +  }
+  +
+          +  @Ignore // this file should return 19.99 for a version number, but currently sees 0.11
+  +  @Test public void testOrcFileVersionCheck() {
+    +    String path = "smalldata/parser/orc/version1999.orc";
+    +    try {
+      +      Log.info("Trying to parse " + path);
+      +      File f = new File(path);
+      +      if( !f.exists() ) throw new H2ONotFoundArgumentException("File " + path + " does not exist");
+      +      f = new File(f.getAbsolutePath());
+      +      Futures fs = new Futures();
+      +      Key fkey = PersistNFS.decodeFile(f);
+      +      new Frame(fkey).delete_and_lock((Key)null); // Lock before making the NFS; avoids racing ImportFiles creating same Frame
+      +      NFSFileVec nfs = NFSFileVec.make(f, fs);
+      +      new Frame(fkey, new String[]{"C1"}, new Vec[]{nfs}).update((Key)null).unlock((Key)null);
+      +      fs.blockForPending();
+      +      ParseSetup pSetup = new ParseSetup();
+      +      pSetup._parse_type = ParserType.GUESS;
+      +      pSetup = ParseSetup.guessSetup(new Key[] {fkey}, pSetup);
+      +      Frame fr = ParseDataset.parse(Key.make(), new Key[] {fkey}, true, pSetup);
+      +      fr.delete();
+      +
+              +    } catch (H2OParseException e) {
+      +      throw Log.throwErr(e);
+      +    }
+    +  }
 }

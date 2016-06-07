@@ -22,7 +22,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import static water.parser.DefaultParserProviders.*;
+import static water.parser.DefaultParserProviders.SVMLight_INFO;
 
 public final class ParseDataset {
   public Job<Frame> _job;
@@ -237,42 +237,129 @@ public final class ParseDataset {
 
     job.update(0, "Ingesting files.");
     VectorGroup vg = getByteVec(fkeys[0]).group();
-    MultiFileParseTask mfpt = pds._mfpt = new MultiFileParseTask(vg,setup,job._key,fkeys,deleteOnDone);
-    mfpt.doAll(fkeys);
-    Log.trace("Done ingesting files.");
-    if( job.stop_requested() ) return pds;
+//    MultiFileParseTask mfpt = pds._mfpt = new MultiFileParseTask(vg,setup,job._key,fkeys,deleteOnDone);
+//    mfpt.doAll(fkeys);
+//    Log.trace("Done ingesting files.");
+//    if( job.stop_requested() ) return pds;
+//
+//    final AppendableVec [] avs = mfpt.vecs();
+//    setup._column_names = getColumnNames(avs.length, setup._column_names);
+//
+//    Frame fr = null;
+//    // Calculate categorical domain
+//    // Filter down to columns with some categoricals
+//    int n = 0;
+//    int[] ecols2 = new int[avs.length];
+//    for( int i = 0; i < avs.length; ++i )
+//      if( avs[i].get_type()==Vec.T_CAT  ) // Intended type is categorical (even though no domain has been set)?
+//        ecols2[n++] = i;
+//    final int[] ecols = Arrays.copyOf(ecols2, n);
+//    // If we have any, go gather unified categorical domains
+//    if( n > 0 ) {
+//      if (!setup.getParseType().isDomainProvided) { // Domains are not provided via setup we need to collect them
+//        job.update(0, "Collecting categorical domains across nodes.");
+//        {
+//          GatherCategoricalDomainsTask gcdt = new GatherCategoricalDomainsTask(mfpt._cKey, ecols).doAllNodes();
+//          //Test domains for excessive length.
+//          List<String> offendingColNames = new ArrayList<>();
+//          for (int i = 0; i < ecols.length; i++) {
+//            if (gcdt.getDomainLength(i) < Categorical.MAX_CATEGORICAL_COUNT) {
+//              if( gcdt.getDomainLength(i)==0 ) avs[ecols[i]].setBad(); // The all-NA column
+//              else avs[ecols[i]].setDomain(gcdt.getDomain(i));
+//            } else
+//              offendingColNames.add(setup._column_names[ecols[i]]);
 
-    final AppendableVec [] avs = mfpt.vecs();
-    setup._column_names = getColumnNames(avs.length, setup._column_names);
+    +      MultiFileParseTask mfpt = pds._mfpt = new MultiFileParseTask(vg, setup, job._key, fkeys, deleteOnDone);
+    +      mfpt.doAll(fkeys);
+    +      Log.trace("Done ingesting files.");
+    +      if( job.stop_requested() ) return;
+    +
+            +      final AppendableVec[] avs = mfpt.vecs();
+    +      setup._column_names = getColumnNames(avs.length, setup._column_names);
+    +
+            +      // Calculate categorical domain
+                    +      // Filter down to columns with some categoricals
+                            +      int n = 0;
+    +      int[] ecols2 = new int[avs.length];
+    +      for (int i = 0; i < avs.length; ++i)
+      +        if (avs[i].get_type() == Vec.T_CAT) // Intended type is categorical (even though no domain has been set)?
+      +          ecols2[n++] = i;
+    +      final int[] ecols = Arrays.copyOf(ecols2, n);
+    +      // If we have any, go gather unified categorical domains
+            +      if (n > 0) {
+      +        job.update(0, "Collecting categorical domains across nodes.");
+      +        {
+              +          GatherCategoricalDomainsTask gcdt = new GatherCategoricalDomainsTask(mfpt._cKey, ecols).doAllNodes();
+      +          //Test domains for excessive length.
+              +          List<String> offendingColNames = new ArrayList<>();
+      +          for (int i = 0; i < ecols.length; i++) {
+        +            if (gcdt.getDomainLength(i) < Categorical.MAX_CATEGORICAL_COUNT) {
+          +              if (gcdt.getDomainLength(i) == 0) avs[ecols[i]].setBad(); // The all-NA column
+          +              else avs[ecols[i]].setDomain(gcdt.getDomain(i));
+          +            } else
+          +              offendingColNames.add(setup._column_names[ecols[i]]);
+        +          }
+      +          if (offendingColNames.size() > 0)
+        +            throw new H2OParseException("Exceeded categorical limit on columns " + offendingColNames + ".   Consider reparsing these columns as a string.");
+      +        }
+      +        Log.trace("Done collecting categorical domains across nodes.");
+      +
+              +        job.update(0, "Compressing data.");
+      +        fr = new Frame(job._result, setup._column_names, AppendableVec.closeAll(avs));
+      +        fr.update(job._key);
+      +        // Update categoricals to the globally agreed numbering
+              +        Vec[] evecs = new Vec[ecols.length];
+      +        for (int i = 0; i < evecs.length; ++i) evecs[i] = fr.vecs()[ecols[i]];
+      +        Log.trace("Done compressing data.");
+      +
+              +        job.update(0, "Unifying categorical domains across nodes.");
+      +        {
+              +          // new CreateParse2GlobalCategoricalMaps(mfpt._cKey).doAll(evecs);
+                      +          // Using Dtask since it starts and returns faster than an MRTask
+                              +          CreateParse2GlobalCategoricalMaps[] fcdt = new CreateParse2GlobalCategoricalMaps[H2O.CLOUD.size()];
+      +          RPC[] rpcs = new RPC[H2O.CLOUD.size()];
+      +          for (int i = 0; i < fcdt.length; i++) {
+        +            H2ONode[] nodes = H2O.CLOUD.members();
+        +            fcdt[i] = new CreateParse2GlobalCategoricalMaps(mfpt._cKey, fr._key, ecols.length);
+        +            rpcs[i] = new RPC<>(nodes[i], fcdt[i]).call();
+        +          }
+      +          for (RPC rpc : rpcs)
+        +            rpc.get();
+      +
+              +          new UpdateCategoricalChunksTask(mfpt._cKey, mfpt._chunk2ParseNodeMap).doAll(evecs);
+      +          MultiFileParseTask._categoricals.remove(mfpt._cKey);
 
-    Frame fr = null;
-    // Calculate categorical domain
-    // Filter down to columns with some categoricals
-    int n = 0;
-    int[] ecols2 = new int[avs.length];
-    for( int i = 0; i < avs.length; ++i )
-      if( avs[i].get_type()==Vec.T_CAT  ) // Intended type is categorical (even though no domain has been set)?
-        ecols2[n++] = i;
-    final int[] ecols = Arrays.copyOf(ecols2, n);
-    // If we have any, go gather unified categorical domains
-    if( n > 0 ) {
-      if (!setup.getParseType().isDomainProvided) { // Domains are not provided via setup we need to collect them
-        job.update(0, "Collecting categorical domains across nodes.");
-        {
-          GatherCategoricalDomainsTask gcdt = new GatherCategoricalDomainsTask(mfpt._cKey, ecols).doAllNodes();
-          //Test domains for excessive length.
-          List<String> offendingColNames = new ArrayList<>();
-          for (int i = 0; i < ecols.length; i++) {
-            if (gcdt.getDomainLength(i) < Categorical.MAX_CATEGORICAL_COUNT) {
-              if( gcdt.getDomainLength(i)==0 ) avs[ecols[i]].setBad(); // The all-NA column
-              else avs[ecols[i]].setDomain(gcdt.getDomain(i));
-            } else
-              offendingColNames.add(setup._column_names[ecols[i]]);
-          }
-          if (offendingColNames.size() > 0)
-            throw new H2OParseException("Exceeded categorical limit on columns "+ offendingColNames+".   Consider reparsing these columns as a string.");
+
+
+
+
+
+
+
+      }
+//          if (offendingColNames.size() > 0)
+//            throw new H2OParseException("Exceeded categorical limit on columns "+ offendingColNames+".   Consider reparsing these columns as a string.");
+
+      +        Log.trace("Done unifying categoricals across nodes.");
+      +      } else {                    // No categoricals case
+      +        job.update(0, "Compressing data.");
+      +        fr = new Frame(job._result, setup._column_names, AppendableVec.closeAll(avs));
+      +        Log.trace("Done closing all Vecs.");
+
+
+
+
+
+
+
+
+
+
         }
-        Log.trace("Done collecting categorical domains across nodes.");
+//        Log.trace("Done collecting categorical domains across nodes.");
+    +      // Check for job cancellation
+            +      if ( job.stop_requested() ) return;
+
       } else {
         // Ignore offending domains
         for (int i = 0; i < ecols.length; i++) {
@@ -280,47 +367,67 @@ public final class ParseDataset {
         }
       }
 
-      job.update(0, "Compressing data.");
-      fr = new Frame(job._result, setup._column_names, AppendableVec.closeAll(avs));
-      fr.update(job);
-      Log.trace("Done compressing data.");
+//      job.update(0, "Compressing data.");
+//      fr = new Frame(job._result, setup._column_names, AppendableVec.closeAll(avs));
+//      fr.update(job);
+//      Log.trace("Done compressing data.");
+
+  +      // SVMLight is sparse format, there may be missing chunks with all 0s, fill them in
+          +      if (setup._parse_type == ParserType.SVMLight)
+          +        new SVFTask(fr).doAllNodes();
+
+
+
       if (!setup.getParseType().isDomainProvided) {
         // Update categoricals to the globally agreed numbering
         Vec[] evecs = new Vec[ecols.length];
         for( int i = 0; i < evecs.length; ++i ) evecs[i] = fr.vecs()[ecols[i]];
-        job.update(0, "Unifying categorical domains across nodes.");
-        {
-          // new CreateParse2GlobalCategoricalMaps(mfpt._cKey).doAll(evecs);
-          // Using Dtask since it starts and returns faster than an MRTask
-          CreateParse2GlobalCategoricalMaps[] fcdt = new CreateParse2GlobalCategoricalMaps[H2O.CLOUD.size()];
-          RPC[] rpcs = new RPC[H2O.CLOUD.size()];
-          for (int i = 0; i < fcdt.length; i++){
-            H2ONode[] nodes = H2O.CLOUD.members();
-            fcdt[i] = new CreateParse2GlobalCategoricalMaps(mfpt._cKey, fr._key, ecols);
-            rpcs[i] = new RPC<>(nodes[i], fcdt[i]).call();
-          }
-          for (RPC rpc : rpcs)
-            rpc.get();
 
-          new UpdateCategoricalChunksTask(mfpt._cKey, mfpt._chunk2ParseNodeMap).doAll(evecs);
-          MultiFileParseTask._categoricals.remove(mfpt._cKey);
-        }
-        Log.trace("Done unifying categoricals across nodes.");
-      }
-    } else {                    // No categoricals case
-      job.update(0,"Compressing data.");
-      fr = new Frame(job._result, setup._column_names,AppendableVec.closeAll(avs));
-      Log.trace("Done closing all Vecs.");
-    }
-    // Check for job cancellation
-    if ( job.stop_requested() ) return pds;
 
-    // SVMLight is sparse format, there may be missing chunks with all 0s, fill them in
-    if (setup._parse_type.equals(SVMLight_INFO))
-      new SVFTask(fr).doAllNodes();
+//        job.update(0, "Unifying categorical domains across nodes.");
+//        {
+//          // new CreateParse2GlobalCategoricalMaps(mfpt._cKey).doAll(evecs);
+//          // Using Dtask since it starts and returns faster than an MRTask
+//          CreateParse2GlobalCategoricalMaps[] fcdt = new CreateParse2GlobalCategoricalMaps[H2O.CLOUD.size()];
+//          RPC[] rpcs = new RPC[H2O.CLOUD.size()];
+//          for (int i = 0; i < fcdt.length; i++){
+//            H2ONode[] nodes = H2O.CLOUD.members();
+//            fcdt[i] = new CreateParse2GlobalCategoricalMaps(mfpt._cKey, fr._key, ecols);
+//            rpcs[i] = new RPC<>(nodes[i], fcdt[i]).call();
+//          }
+//          for (RPC rpc : rpcs)
+//            rpc.get();
 
-    // Check for job cancellation
-    if ( job.stop_requested() ) return pds;
+    +      // Check for job cancellation
+            +      if ( job.stop_requested() ) return;
+    +
+            +      // Log any errors
+                    +      if (mfpt._errors != null)
+      +        for (String err : mfpt._errors)
+      +          Log.warn(err);
+
+
+
+
+//          new UpdateCategoricalChunksTask(mfpt._cKey, mfpt._chunk2ParseNodeMap).doAll(evecs);
+//          MultiFileParseTask._categoricals.remove(mfpt._cKey);
+//        }
+//        Log.trace("Done unifying categoricals across nodes.");
+//      }
+//    } else {                    // No categoricals case
+//      job.update(0,"Compressing data.");
+//      fr = new Frame(job._result, setup._column_names,AppendableVec.closeAll(avs));
+//      Log.trace("Done closing all Vecs.");
+//    }
+//    // Check for job cancellation
+//    if ( job.stop_requested() ) return pds;
+//
+//    // SVMLight is sparse format, there may be missing chunks with all 0s, fill them in
+//    if (setup._parse_type.equals(SVMLight_INFO))
+//      new SVFTask(fr).doAllNodes();
+//
+//    // Check for job cancellation
+//    if ( job.stop_requested() ) return pds;
 
     ParseWriter.ParseErr [] errs = ArrayUtils.append(setup._errs,mfpt._errors);
     if(errs.length > 0) {
@@ -794,6 +901,31 @@ public final class ParseDataset {
       final int chunkStartIdx = _fileChunkOffsets[_lo];
       Log.trace("Begin a map stage of a file parse with start index " + chunkStartIdx + ".");
 
+
+      +      if (_parseSetup._parse_type == ParserType.ORC) {
+        +        OrcParser parser = new OrcParser(key);
+        +        long lens[] = parser.getDataLengths();
+        +        int nChunks[] = new int[parser.getStripeCount()];
+        +        for (int i = 0; i < parser.getStripeCount(); i++)
+          +          nChunks[i] = (int) lens[i] / _parseSetup._chunk_size;
+        +        DistributedOrcReader[] dor = new DistributedOrcReader[parser.getStripeCount()];
+        +        RPC[] rpcs = new RPC[parser.getStripeCount()];
+        +        for (int i = 0; i < dor.length; i++){
+          +          H2ONode[] nodes = H2O.CLOUD.members();
+          +          dor[i] = new DistributedOrcReader(_vg, _parseSetup, _vecIdStart, chunkStartIdx, this, key, nChunks[i]);
+          +          rpcs[i] = new RPC<>(nodes[i], dor[i]).call();
+          +        }
+        +        for (RPC rpc : rpcs)
+          +          rpc.get();
+        +        //FIXME append all results into _dout
+                +        //FIXME close OrcParser
+                        +        return;
+        +      }
+      +
+              +      ParseSetup localSetup = new ParseSetup(_parseSetup);
+      +      ByteVec vec = getByteVec(key);
+
+
       byte[] zips = vec.getFirstBytes();
       ZipUtil.Compression cpr = ZipUtil.guessCompressionMethod(zips);
 
@@ -1127,6 +1259,109 @@ public final class ParseDataset {
       return pe1;
     }
   }
+
+
+  +  private static class DistributedOrcReader extends DTask {
+    +    private transient OrcParser _reader;
+    +    private final ParseSetup _setup;
+    +    private final int _vecIdStart;
+    +    private final int _startChunkIdx; // for multifile parse, offset of the first chunk in the final dataset
+    +    private final VectorGroup _vg;
+    +    private FVecParseWriter _dout;
+    +    private final Key _cKey;  // Parse-local-categoricals key
+    +    private final Key<Job> _jobKey;
+    +    private transient final MultiFileParseTask _outerMFPT;
+    +    private transient final Key _srckey; // Source/text file to delete on done
+    +    private transient long [] _espc;
+    +    final int _nchunks;
+    +
+            +    private final byte[] _colTypes;
+    +    private final Key _fileKey;
+    +    private final Key[] _vecKeys;
+    +
+            +
+            +    private DistributedOrcReader(VectorGroup vg, ParseSetup setup, int vecIdstart, int startChunkIdx, MultiFileParseTask mfpt, Key srckey, int nchunks) {
+      +      super(mfpt);
+      +      _vg = vg;
+      +      _setup = setup;
+      +      _vecIdStart = vecIdstart;
+      +      _startChunkIdx = startChunkIdx;
+      +      _outerMFPT = mfpt;
+      +      _cKey = mfpt._cKey;
+      +      _jobKey = mfpt._jobKey;
+      +      _srckey = srckey;
+      +      _nchunks = nchunks;
+      +    }
+    +    @Override public void setupLocal(){
+      +      _espc = MemoryManager.malloc8(_nchunks);
+      +    }
+    +    @Override public void compute2() {
+      +      if( _jobKey.get().stop_requested() ) return;
+      +      _reader = new OrcParser(_fileKey);
+      +      // Get number of stripes
+              +      int stripeCount = _reader.getStripeCount();
+      +      final long[] offsets = _reader.getStripeOffsets();
+      +      final long[] lengths = _reader.getStripeLengths();
+      +      // Calc local share of work
+              +      int localStripeCnt, localStripeStart = 0;
+      +      if (H2O.getCloudSize() > 1) {
+        +        localStripeCnt = stripeCount / H2O.getCloudSize();
+        +        int remainder = stripeCount % H2O.getCloudSize();
+        +        if ( remainder >= H2O.SELF.index() + 1) {
+          +          localStripeCnt++;
+          +          localStripeStart = localStripeCnt * H2O.SELF.index();
+          +        } else {
+          +          localStripeStart = (remainder * (localStripeCnt+1))
+                  +              + ((H2O.SELF.index()-remainder)*localStripeCnt);
+          +        }
+        +      } else localStripeCnt = stripeCount;
+      +
+              +      // Spawn threads for local work
+                      +      H2OCountedCompleter[] readerTasks = new H2OCountedCompleter[localStripeCnt];
+      +      for (int i = 0; i < localStripeCnt; i++) {
+        +        final int fi = i + localStripeStart;
+        +        H2O.submitTask(readerTasks[i] = new H2OCountedCompleter() {
+          +          @Override
+          +          public void compute2() {
+            +            NewChunk[] nchks = createNewChunks(_vecKeys, _colTypes, fi);
+            +            _reader.readStripe(nchks, offsets[fi], lengths[fi]);
+            +            closeNewChunks(nchks);
+            +            tryComplete();
+            +          }
+          +        });
+        +      }
+      +      for (H2OCountedCompleter task : readerTasks) task.join();
+      +      tryComplete();
+      +    }
+    +
+            +    public long[] getEspc() {
+      +      return _reader.getEspc();
+      +    }
+    +
+            +    // Make NewChunks to for holding data from e.g. Spark.  Once per set of
+            +    // Chunks in a Frame, before filling them.  This can be called in parallel
+            +    // for different Chunk#'s (cidx); each Chunk can be filled in parallel.
+            +    static NewChunk[] createNewChunks(Key[] vecKeys, byte[] type, int cidx ) {
+      +      NewChunk[] nchks = new NewChunk[type.length];
+      +      for( int i=0; i<nchks.length; i++ )
+        +        nchks[i] = new NewChunk(new AppendableVec(vecKeys[i],type[i]),cidx);
+      +      return nchks;
+      +    }
+    +
+            +    // Compress & DKV.put NewChunks.  Once per set of Chunks in a Frame, after
+            +    // filling them.  Can be called in parallel for different sets of Chunks.
+            +    static void closeNewChunks( NewChunk[] nchks ) {
+      +      Futures fs = new Futures();
+      +      for( NewChunk nchk : nchks ) nchk.close(fs);
+      +      fs.blockForPending();
+      +    }
+    +  }
+
+
+
+
+
+
 }
 
 

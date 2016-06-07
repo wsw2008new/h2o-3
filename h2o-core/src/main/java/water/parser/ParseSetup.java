@@ -3,7 +3,14 @@ package water.parser;
 import water.*;
 import water.api.ParseSetupV3;
 import water.exceptions.H2OIllegalArgumentException;
-import water.fvec.*;
+//import water.fvec.*;
+
++import water.fvec.Frame;
++import water.fvec.Vec;
++import water.fvec.UploadFileVec;
++import water.fvec.FileVec;
++import water.fvec.ByteVec;
+
 import water.util.ArrayUtils;
 import water.util.Log;
 

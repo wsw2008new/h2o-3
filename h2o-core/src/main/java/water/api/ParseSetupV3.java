@@ -16,6 +16,10 @@ public class ParseSetupV3 extends RequestSchema<ParseSetup,ParseSetupV3> {
   @API(help="Source frames", required=true, direction=API.Direction.INOUT)
   public FrameKeyV3[] source_frames;
 
+  // patch does not apply
+//  @API(help="Parser type", values = {"GUESS", "ARFF", "XLS", "XLSX", "CSV", "SVMLight", "ORC"}, direction=API.Direction.INOUT)
+//  public ParserType parse_type = ParserType.GUESS;
+
   @API(help="Parser type", valuesProvider = ParseTypeValuesProvider.class, direction=API.Direction.INOUT)
   public String parse_type = GUESS_INFO.name();
 
