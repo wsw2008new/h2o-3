@@ -7,3 +7,7 @@ schemas.json
 *.log
 *.out
 *.toc
+
+# Ignore _build folder and version file
+src/product/_build
+src/product/project_version
