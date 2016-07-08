@@ -899,8 +899,6 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
     if (expensive && isSupervised()) {
       String[] skipCols = Arrays.copyOf(specialColNames(), numSpecialCols() + 1); //weight,offset,fold
       skipCols[numSpecialCols()] = _parms._response_column; //response
-      _origNames = _train.names();
-      _origDomains = _train.domains();
       Frame newtrain = FrameUtils.categoricalEncoder(_train, skipCols, _parms._categorical_encoding);
       if (newtrain!=_train) {
         _train = newtrain;

@@ -867,7 +867,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
   
   public Frame score(Frame fr, String destination_key, Job j) throws IllegalArgumentException {
     Frame adaptFr = new Frame(fr);
-    final boolean computeMetrics = (!isSupervised() || adaptFr.vec(_output.responseName()) != null && !adaptFr.vec(_output.responseName()).isBad());
+    final boolean computeMetrics = (!isSupervised() || (adaptFr.vec(_output.responseName()) != null && !adaptFr.vec(_output.responseName()).isBad()));
     adaptTestForTrain(adaptFr,true, computeMetrics);   // Adapt
     Frame output = predictScoreImpl(fr, adaptFr, destination_key, j); // Predict & Score
     // Log modest confusion matrices
@@ -936,7 +936,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
    */
  
   protected Frame predictScoreImpl(Frame fr, Frame adaptFrm, String destination_key, Job j) {
-    final boolean computeMetrics = (!isSupervised() || adaptFrm.vec(_output.responseName()) != null && !adaptFrm.vec(_output.responseName()).isBad());
+    final boolean computeMetrics = (!isSupervised() || (adaptFrm.vec(_output.responseName()) != null && !adaptFrm.vec(_output.responseName()).isBad()));
     // Build up the names & domains.
     String[] names = makeScoringNames();
     String[][] domains = new String[names.length][];
@@ -954,7 +954,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
    * @return MetricBuilder
    */
   protected ModelMetrics.MetricBuilder scoreMetrics(Frame adaptFrm) {
-    final boolean computeMetrics = (!isSupervised() || adaptFrm.find(_output.responseName()) != -1);
+    final boolean computeMetrics = (!isSupervised() || (adaptFrm.vec(_output.responseName()) != null && !adaptFrm.vec(_output.responseName()).isBad()));
     // Build up the names & domains.
     String [] domain = !computeMetrics ? _output._domains[_output._domains.length-1] : adaptFrm.lastVec().domain();
     // Score the dataset, building the class distribution & predictions
@@ -1300,7 +1300,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
   public boolean testJavaScoring( Frame data, Frame model_predictions, double rel_epsilon) {
     assert data.numRows()==model_predictions.numRows();
     final Frame fr = new Frame(data);
-    boolean computeMetrics = data.find(_output.responseName()) != -1;
+    boolean computeMetrics = data.vec(_output.responseName()) != null && !data.vec(_output.responseName()).isBad();
     try {
       String[] warns = adaptTestForTrain(fr,true, computeMetrics);
       if( warns.length > 0 )
