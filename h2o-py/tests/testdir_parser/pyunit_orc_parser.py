@@ -74,8 +74,7 @@ def orc_parser_test():
         if (fIndex == 32):  # no column information, only orc header, badly formed file
             continue
 
-        randNum = randint(0,9)
-
+#        randNum = randint(0,9)
         # if (randNum > 3):  # skip test for 70% of the time
         #     continue
 

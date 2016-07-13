@@ -70,12 +70,9 @@ test.orc_parser <- function(){
     if (fIndex == 32)  # no column information, only orc header, badly formed file
       next
 
-    randomInt = sample(1:10,1)
-
-    if (randomInt > 3)
-      next
-
-    browser()
+#    randomInt = sample(1:10,1)
+#    if (randomInt > 3)
+#      next
     
     h2oFrame = h2o.importFile(locate(allOrcFiles[temp]))
   }

@@ -112,11 +112,11 @@ public class ParseTestOrc extends TestUtil {
 //      if (fIndex == 17)   // problem with bigint retrieval, wait for Tomas
 //        continue;
 
-      Random rn = new Random();
-      int randNum = rn.nextInt(10);
-
-      if (randNum > 3)  // skip test for 70% of the time
-        continue;
+//      Random rn = new Random();
+//      int randNum = rn.nextInt(10);
+//
+//      if (randNum > 3)  // skip test for 70% of the time
+//        continue;
 
       String fileName = allOrcFiles[fIndex];
       Log.info("Orc Parser parsing " + fileName);
