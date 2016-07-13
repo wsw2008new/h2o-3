@@ -1,25 +1,19 @@
 package water.parser.orc;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.vector.*;
-import org.apache.hadoop.hive.ql.io.orc.*;
+import org.apache.hadoop.hive.ql.io.orc.Reader;
+import org.apache.hadoop.hive.ql.io.orc.RecordReader;
+import org.apache.hadoop.hive.ql.io.orc.StripeInformation;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.*;
 import water.H2O;
 import water.Iced;
 import water.Job;
 import water.Key;
-import water.fvec.Frame;
-import water.fvec.Vec;
 import water.parser.*;
-import water.persist.PersistHdfs;
 import water.util.Log;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -226,7 +220,10 @@ public class OrcParser extends Parser {
       if (isNull[rowIndex])
         dout.addInvalidCol(cIdx);
       else {
-        dout.addStrCol(cIdx, bs.set(oneColumn[rowIndex],stringStart[rowIndex],stringLength[rowIndex]));
+        if (stringLength[rowIndex] == 0) {  // string value same as last one, no need to set buffer bs
+          dout.addStrCol(cIdx, bs);
+        } else
+          dout.addStrCol(cIdx, bs.set(oneColumn[rowIndex],stringStart[rowIndex],stringLength[rowIndex]));
       }
     }
   }
