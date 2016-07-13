@@ -234,6 +234,10 @@ class H2OCache(object):
 
   def _fill_data(self, json):
     self._data = collections.OrderedDict()
+
+    if self.nrows == 0:   # return frame with zero rows but only column information.
+      return self
+
     for c in json["columns"]:
       c.pop('__meta')              # Redundant description ColV3
       c.pop('domain_cardinality')  # Same as len(c['domain'])
