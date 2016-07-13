@@ -54,7 +54,6 @@ public class ParseTestOrc extends TestUtil {
 //      "smalldata/parser/orc/TestOrcFile.test1.orc",
       "smalldata/parser/orc/demo-11-zlib.orc",
       "smalldata/parser/orc/TestOrcFile.testDate1900.orc",
-      "smalldata/parser/orc/TestOrcFile.testDate1900.orc",
       "smalldata/parser/orc/demo-12-zlib.orc",
       "smalldata/parser/orc/TestOrcFile.testDate2038.orc",
       "smalldata/parser/orc/double_single_col.orc",
