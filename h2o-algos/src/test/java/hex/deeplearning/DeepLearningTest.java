@@ -1997,13 +1997,14 @@ public class DeepLearningTest extends TestUtil {
       parms._seed = 0xdecaf;
       parms._nfolds = 3;
       parms._categorical_encoding = Model.Parameters.CategoricalEncodingScheme.Eigen;
+      parms._score_training_samples = 0;
 
       dl = new DeepLearning(parms).trainModel().get();
 
-      Assert.assertEquals(0.94905686, ((ModelMetricsBinomial)dl._output._training_metrics)._auc._auc,1e-4);
-      Assert.assertEquals(0.94905686, ((ModelMetricsBinomial)dl._output._validation_metrics)._auc._auc,1e-4);
-      Assert.assertEquals(0.90714833, ((ModelMetricsBinomial)dl._output._cross_validation_metrics)._auc._auc,1e-5);
-      Assert.assertEquals(0.90714833, Double.parseDouble((String)(dl._output._cross_validation_metrics_summary).get(1,0)), 1e-2);
+      Assert.assertEquals(0.95176, ((ModelMetricsBinomial)dl._output._training_metrics)._auc._auc,1e-4);
+      Assert.assertEquals(0.94829, ((ModelMetricsBinomial)dl._output._validation_metrics)._auc._auc,1e-3);
+      Assert.assertEquals(0.9128, ((ModelMetricsBinomial)dl._output._cross_validation_metrics)._auc._auc,1e-2);
+      Assert.assertEquals(0.9200, Double.parseDouble((String)(dl._output._cross_validation_metrics_summary).get(1,0)), 1e-2);
 
     } finally {
       if (tfr != null) tfr.remove();
@@ -2053,7 +2054,7 @@ public class DeepLearningTest extends TestUtil {
 
   @Ignore
   @Test
-  public void testMultinomial() {
+  public void testMultinomialMNIST() {
     Frame train = null;
     Frame preds = null;
     Frame small = null, large = null;
@@ -2090,9 +2091,6 @@ public class DeepLearningTest extends TestUtil {
 
         ModelMetricsMultinomial mm = ModelMetricsMultinomial.make(preds, labels, fullDomain);
         Log.info(mm.toString());
-
-        small.remove();
-        large.remove();
       }
     } catch(Throwable t) {
       t.printStackTrace();
@@ -2104,6 +2102,136 @@ public class DeepLearningTest extends TestUtil {
       if (train!=null)  train.remove();
       if (small!=null)  small.delete();
       if (large!=null)  large.delete();
+      Scope.exit();
+    }
+  }
+
+
+  @Test
+  public void testMultinomial() {
+    Frame train = null;
+    Frame preds = null;
+    DeepLearningModel model = null;
+    Scope.enter();
+    try {
+      train = parse_test_file("./smalldata/junit/titanic_alt.csv");
+      Vec v = train.remove("pclass");
+      train.add("pclass", v.toCategoricalVec());
+      v.remove();
+      DKV.put(train);
+
+      DeepLearningParameters p = new DeepLearningParameters();
+      p._train = train._key;
+      p._response_column = "pclass"; // last column is the response
+      p._activation = DeepLearningParameters.Activation.RectifierWithDropout;
+      p._hidden = new int[]{50, 50};
+      p._epochs = 1;
+      p._adaptive_rate = false;
+      p._rate = 0.005;
+      p._sparse = true;
+      model = new DeepLearning(p).trainModel().get();
+
+      preds = model.score(train);
+      preds.remove(0); //remove label, keep only probs
+      Vec labels = train.vec("pclass"); //actual
+      String[] fullDomain = train.vec("pclass").domain(); //actual
+
+      ModelMetricsMultinomial mm = ModelMetricsMultinomial.make(preds, labels, fullDomain);
+      Log.info(mm.toString());
+    } finally {
+      if (model!=null)  model.delete();
+      if (preds!=null)  preds.remove();
+      if (train!=null)  train.remove();
+      Scope.exit();
+    }
+  }
+
+  @Test
+  public void testBinomial() {
+    Frame train = null;
+    Frame preds = null;
+    Frame small = null, large = null;
+    DeepLearningModel model = null;
+    Scope.enter();
+    try {
+      train = parse_test_file("./smalldata/junit/titanic_alt.csv");
+      Vec v = train.remove("survived");
+      train.add("survived", v.toCategoricalVec());
+      v.remove();
+      DKV.put(train);
+      DeepLearningParameters parms = new DeepLearningParameters();
+      parms._train = train._key;
+      parms._response_column = "survived";
+      parms._reproducible = true;
+      parms._hidden = new int[]{20,20};
+      parms._seed = 0xdecaf;
+      model = new DeepLearning(parms).trainModel().get();
+
+      FrameSplitter fs = new FrameSplitter(train, new double[]{0.002},new Key[]{Key.make("small"),Key.make("large")},null);
+      fs.compute2();
+      small = fs.getResult()[0];
+      large = fs.getResult()[1];
+      preds = model.score(small);
+      Vec labels = small.vec("survived"); //actual
+      String[] fullDomain = train.vec("survived").domain(); //actual
+
+      ModelMetricsBinomial mm = ModelMetricsBinomial.make(preds.vec(2), labels, fullDomain);
+      Log.info(mm.toString());
+
+      mm = ModelMetricsBinomial.make(preds.vec(2), labels, new String[]{"NO","1"});
+      Log.info(mm.toString());
+
+    } catch(Throwable t) {
+      t.printStackTrace();
+      throw t;
+    }
+    finally {
+      if (model!=null)  model.delete();
+      if (preds!=null)  preds.remove();
+      if (train!=null)  train.remove();
+      if (small!=null)  small.delete();
+      if (large!=null)  large.delete();
+      Scope.exit();
+    }
+  }
+
+  @Test
+  public void testRegression() {
+    Frame train = null;
+    Frame preds = null;
+    DeepLearningModel model = null;
+    Scope.enter();
+    try {
+      train = parse_test_file("./smalldata/junit/titanic_alt.csv");
+      DeepLearningParameters parms = new DeepLearningParameters();
+      parms._train = train._key;
+      parms._response_column = "age";
+      parms._reproducible = true;
+      parms._hidden = new int[]{20,20};
+      parms._distribution = laplace;
+      parms._seed = 0xdecaf;
+      model = new DeepLearning(parms).trainModel().get();
+
+      preds = model.score(train);
+      Vec targets = train.vec("age"); //actual
+
+      ModelMetricsRegression mm = ModelMetricsRegression.make(preds.vec(0), targets, parms._distribution);
+      Log.info(mm.toString());
+
+      mm = ModelMetricsRegression.make(preds.vec(0), targets, gaussian);
+      Log.info(mm.toString());
+
+      mm = ModelMetricsRegression.make(preds.vec(0), targets, poisson);
+      Log.info(mm.toString());
+
+    } catch(Throwable t) {
+      t.printStackTrace();
+      throw t;
+    }
+    finally {
+      if (model!=null)  model.delete();
+      if (preds!=null)  preds.remove();
+      if (train!=null)  train.remove();
       Scope.exit();
     }
   }

@@ -97,37 +97,37 @@ public class ModelMetricsMultinomial extends ModelMetricsSupervised {
     return table;
   }
 
-
   /**
    * Build a Multinomial ModelMetrics object from per-class probabilities (in Frame preds - no labels!), from actual labels, and a given domain for all possible labels (maybe more than what's in labels)
    * @param perClassProbs Frame containing predicted per-class probabilities (and no predicted labels)
-   * @param actualLabels A Vec containing the actual labels (can be less than what's in domain, since the predictions can be for a small subset of the data)
-   * @param domain Ordered list of factor levels for which the probabilities are given (perClassProbs[i] are the per-observation probabilities for belonging to class domain[i])
+   * @param actualLabels A Vec containing the actual labels (can be for fewer labels than what's in domain, since the predictions can be for a small subset of the data)
    * @return ModelMetrics object
    */
-  static public ModelMetricsMultinomial make(Frame perClassProbs, Vec actualLabels, String[] domain) {
-    return make(perClassProbs, actualLabels, domain, 10);
+  static public ModelMetricsMultinomial make(Frame perClassProbs, Vec actualLabels) {
+    String[] names = perClassProbs.names();
+    String[] label = actualLabels.domain();
+    String[] union = ArrayUtils.union(names, label, true);
+    if (union.length == names.length + label.length)
+      throw new IllegalArgumentException("Column names of per-class-probabilities and categorical domain of actual labels have no common values!");
+    return make(perClassProbs, actualLabels, perClassProbs.names());
   }
 
   /**
    * Build a Multinomial ModelMetrics object from per-class probabilities (in Frame preds - no labels!), from actual labels, and a given domain for all possible labels (maybe more than what's in labels)
    * @param perClassProbs Frame containing predicted per-class probabilities (and no predicted labels)
-   * @param actualLabels A Vec containing the actual labels (can be less than what's in domain, since the predictions can be for a small subset of the data)
+   * @param actualLabels A Vec containing the actual labels (can be for fewer labels than what's in domain, since the predictions can be for a small subset of the data)
    * @param domain Ordered list of factor levels for which the probabilities are given (perClassProbs[i] are the per-observation probabilities for belonging to class domain[i])
-   * @param topKHitRatio Top K for hitratio computation
    * @return ModelMetrics object
    */
-  static public ModelMetricsMultinomial make(Frame perClassProbs, Vec actualLabels, String[] domain, int topKHitRatio) {
+  static public ModelMetricsMultinomial make(Frame perClassProbs, Vec actualLabels, String[] domain) {
     Vec _labels = actualLabels.toCategoricalVec();
     if (_labels == null || perClassProbs == null)
       throw new IllegalArgumentException("Missing actualLabels or predictedProbs!");
     if (_labels.length() != perClassProbs.numRows())
       throw new IllegalArgumentException("Both arguments must have the same length (" + _labels.length() + "!=" + perClassProbs.numRows() + ")!");
-    if (_labels.cardinality() <= 1)
-      throw new IllegalArgumentException("Labels, must have cardinality >1, but found " + _labels.cardinality() + "!");
     for (Vec p : perClassProbs.vecs()) {
-      if (p.isCategorical())
-        throw new IllegalArgumentException("Predicted probabilities cannot be class labels, expect only per-class probabilities.");
+      if (!p.isNumeric())
+        throw new IllegalArgumentException("Predicted probabilities must be numeric per-class probabilities.");
       if (p.min() < 0 || p.max() > 1)
         throw new IllegalArgumentException("Predicted probabilities must be between 0 and 1.");
     }
@@ -137,7 +137,8 @@ public class ModelMetricsMultinomial extends ModelMetricsSupervised {
     _labels = _labels.adaptTo(domain);
     Frame predsLabel = new Frame(perClassProbs);
     predsLabel.add("labels", _labels);
-    ModelMetricsMultinomial mm = new MultinomialMetrics(_labels.domain(), topKHitRatio).doAll(predsLabel)._mm;
+    ModelMetricsMultinomial mm = new MultinomialMetrics(_labels.domain()).doAll(predsLabel)._mm;
+    mm._description = "Computed on user-given predictions and labels";
     _labels.remove();
     return mm;
   }
@@ -145,12 +146,11 @@ public class ModelMetricsMultinomial extends ModelMetricsSupervised {
   // helper to build a ModelMetricsMultinomial for a N-class problem from a Frame that contains N per-class probability columns, and the actual label as the (N+1)-th column
   private static class MultinomialMetrics extends MRTask<MultinomialMetrics> {
     public ModelMetricsMultinomial _mm; //OUTPUT
-    public MultinomialMetrics(String[] domain, int hitRatioK) { this.domain = domain; this.hitRatioK = hitRatioK; }
-    int hitRatioK;
+    public MultinomialMetrics(String[] domain) { this.domain = domain; }
     String[] domain;
     private MetricBuilderMultinomial _mb;
     @Override public void map(Chunk[] chks) {
-      _mb = new MetricBuilderMultinomial(hitRatioK, domain);
+      _mb = new MetricBuilderMultinomial(domain.length, domain);
       Chunk actuals = chks[chks.length-1];
       double [] ds = new double[chks.length];
       for (int i=0;i<chks[0]._len;++i) {
