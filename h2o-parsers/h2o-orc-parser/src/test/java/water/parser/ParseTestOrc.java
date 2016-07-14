@@ -42,6 +42,8 @@ public class ParseTestOrc extends TestUtil {
   private long ERRORMARGIN = 1000L;  // error margin when compare timestamp.
   int totalFilesTested = 0;
   int numberWrong = 0;
+  BufferedString h2o = new BufferedString();
+  BufferedString tempOrc = new BufferedString();
 
   // list all orc files in smalldata/parser/orc directory
   private String[] allOrcFiles = {
@@ -342,16 +344,15 @@ public class ParseTestOrc extends TestUtil {
     byte[][] oneColumn = ((BytesColumnVector) oneStringColumn).vector;
     int[] stringLength = ((BytesColumnVector) oneStringColumn).length;
     int[] stringStart = ((BytesColumnVector) oneStringColumn).start;
-
     long frameRowIndex = startRowIndex;
-    BufferedString h2o = new BufferedString();
-    BufferedString tempOrc = new BufferedString();
 
     for (int rowIndex = 0; rowIndex < currentBatchRow; rowIndex++) {
       if (isNull[rowIndex])
         assertEquals("Na is found: ", true, h2oFrame.isNA(frameRowIndex));
       else {
-            tempOrc.set(oneColumn[rowIndex], stringStart[rowIndex], stringLength[rowIndex]);
+            if (stringLength[rowIndex] > 0)
+              tempOrc.set(oneColumn[rowIndex], stringStart[rowIndex], stringLength[rowIndex]);
+
             h2oFrame.atStr(h2o, frameRowIndex);
             assertEquals("String/char elements should equal: ", true, tempOrc.equals(h2o));
       }
