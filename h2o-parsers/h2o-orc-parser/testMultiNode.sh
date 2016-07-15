@@ -66,9 +66,9 @@ JUNIT_RUNNER="water.junit.H2OTestRunner"
 # Slash/dot "water/MRThrow"      becomes "water.MRThrow"
 
 # On this h2o-algos testMultiNode.sh only, force the tests.txt to be in the same order for all machines.
-# If sorted, the result of the cd/grep varies by machine. 
+# If sorted, the result of the cd/grep varies by machine.
 # If randomness is desired, replace sort with the unix 'shuf'
-# Use /usr/bin/sort because of cygwin on windows. 
+# Use /usr/bin/sort because of cygwin on windows.
 # Windows has sort.exe which you don't want. Fails? (is it a lineend issue)
 (cd src/test/java; /usr/bin/find . -name '*.java' | cut -c3- | sed 's/.....$//' | sed -e 's/\//./g') | grep -v $JUNIT_TESTS_BOOT | grep -v $JUNIT_TESTS_BIG | /usr/bin/sort > $OUTDIR/tests.txt
 
@@ -89,6 +89,6 @@ $JVM water.H2O -name $CLUSTER_NAME -baseport $CLUSTER_BASEPORT -ga_opt_out 1> $O
 echo Running h2o-orc-parser junit tests...
 ($JVM -Ddoonly.tests=$DOONLY -Dbuild.id=$BUILD_ID -Dignore.tests=$IGNORE -Djob.name=$JOB_NAME -Dgit.commit=$GIT_COMMIT -Dgit.branch=$GIT_BRANCH -Dai.h2o.name=$CLUSTER_NAME -Dai.h2o.baseport=$CLUSTER_BASEPORT -Dai.h2o.ga_opt_out=yes $JUNIT_RUNNER `cat $OUTDIR/tests.txt` 2>&1 ; echo $? > $OUTDIR/status.0) 1> $OUTDIR/out.0 2>&1
 
-grep EXECUTION $OUTDIR/out.0 | cut "-d " -f22,19 | awk '{print $2 " " $1}'| sort -gr | head -n 10 >> $OUTDIR/out.0
+grep EXECUTION $OUTDIR/out.0 | sed -e "s/.*TEST \(.*\) EXECUTION TIME: \(.*\) (Wall.*/\2 \1/" | sort -gr | head -n 10 >> $OUTDIR/out.0
 
 cleanup
