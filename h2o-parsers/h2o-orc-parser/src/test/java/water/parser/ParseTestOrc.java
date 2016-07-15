@@ -44,6 +44,8 @@ public class ParseTestOrc extends TestUtil {
   int numberWrong = 0;
   BufferedString h2o = new BufferedString();
   BufferedString tempOrc = new BufferedString();
+  public static final int DAY_TO_MS = 24*3600*1000;
+  public static final int ADD_OFFSET = 8*3600*1000;
 
   // list all orc files in smalldata/parser/orc directory
   private String[] allOrcFiles = {
@@ -283,7 +285,6 @@ public class ParseTestOrc extends TestUtil {
       case "int":
       case "smallint":
       case "tinyint":
-      case "date":  //FIXME: make sure this is what the customer wants
         CompareLongcolumn(oneColumn, oneColumn.isNull, currentBatchRow, h2oColumn, startRowIndex);
         break;
       case "float":
@@ -296,10 +297,11 @@ public class ParseTestOrc extends TestUtil {
       case "binary":  //FIXME: only reading it as string right now.
         compareStringcolumn(oneColumn, oneColumn.isNull, currentBatchRow, h2oColumn, startRowIndex, columnType);
         break;
-      case "timestamp": //FIXME: read in as a number
-        compareTimecolumn(oneColumn, oneColumn.isNull, currentBatchRow, h2oColumn, startRowIndex);
+      case "timestamp":
+      case "date":
+        compareTimecolumn(oneColumn, columnType, oneColumn.isNull, currentBatchRow, h2oColumn, startRowIndex);
         break;
-      case "decimal":   //FIXME: make sure we interpret this correctly, ignore the scale right now
+      case "decimal":
         compareDecimalcolumn(oneColumn, oneColumn.isNull, currentBatchRow, h2oColumn, startRowIndex);
         break;
       default:
@@ -323,7 +325,7 @@ public class ParseTestOrc extends TestUtil {
     }
   }
 
-  private void compareTimecolumn(ColumnVector oneTSColumn, boolean[] isNull, long currentBatchRow,
+  private void compareTimecolumn(ColumnVector oneTSColumn, String columnType, boolean[] isNull, long currentBatchRow,
                                         Vec h2oFrame, Long startRowIndex) {
     long[] oneColumn = ((LongColumnVector) oneTSColumn).vector;
     long frameRowIndex = startRowIndex;
@@ -331,9 +333,14 @@ public class ParseTestOrc extends TestUtil {
     for (int rowIndex = 0; rowIndex < currentBatchRow; rowIndex++) {
       if (isNull[rowIndex])
         assertEquals("Na is found: ", true, h2oFrame.isNA(frameRowIndex));
-      else
-        assertEquals("Numerical elements should equal: ", oneColumn[rowIndex], h2oFrame.at8(frameRowIndex),
+      else {
+        if (columnType.contains("timestamp"))
+          assertEquals("Numerical elements should equal: ", oneColumn[rowIndex]/1000000, h2oFrame.at8(frameRowIndex),
                 ERRORMARGIN);
+        else
+          assertEquals("Numerical elements should equal: ", oneColumn[rowIndex]*DAY_TO_MS+ADD_OFFSET,
+                  h2oFrame.at8(frameRowIndex), ERRORMARGIN);
+      }
 
       frameRowIndex++;
     }
