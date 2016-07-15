@@ -143,7 +143,7 @@ public final class PersistHdfs extends Persist {
         try {
 //          fs.getDefaultBlockSize(p);
 
-            s = fs.open(p);
+          s = fs.open(p);
 //          System.out.println("default block size = " + fs.getDefaultBlockSize(p));
 //          FileStatus f = fs.getFileStatus(p);
 //          BlockLocation [] bs = fs.getFileBlockLocations(f,0,f.getLen());
