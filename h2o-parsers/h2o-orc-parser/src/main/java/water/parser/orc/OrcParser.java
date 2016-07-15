@@ -43,6 +43,8 @@ public class OrcParser extends Parser {
   /** Orc Info */
   private final Reader orcFileReader; // can generate all the other fields from this reader
   private BufferedString bs = new BufferedString();
+  public static final int DAY_TO_MS = 24*3600*1000;
+  public static final int ADD_OFFSET = 8*3600*1000;
 
   OrcParser(ParseSetup setup, Key<Job> jobKey) {
     super(setup, jobKey);
@@ -118,7 +120,7 @@ public class OrcParser extends Parser {
         case "int":
         case "smallint":
         case "tinyint":
-        case "date":  //FIXME: make sure this is what the customer wants
+
           writeLongcolumn(oneColumn, columnType, oneColumn.noNulls, oneColumn.isNull, cIdx, rowNumber, dout);
           break;
         case "float":
@@ -131,10 +133,11 @@ public class OrcParser extends Parser {
         case "binary":  //FIXME: only reading it as string right now.
           writeStringcolumn(oneColumn, columnType, oneColumn.noNulls, oneColumn.isNull, cIdx, rowNumber, dout);
           break;
-        case "timestamp": //FIXME: read in as a number
-          writeTimecolumn(oneColumn, oneColumn.noNulls, oneColumn.isNull, cIdx, rowNumber, dout);
+        case "date":
+        case "timestamp":
+          writeTimecolumn(oneColumn, columnType, oneColumn.noNulls, oneColumn.isNull, cIdx, rowNumber, dout);
           break;
-        case "decimal":   //FIXME: make sure we interpret this correctly, ignore the scale right now
+        case "decimal":
           writeDecimalcolumn(oneColumn, oneColumn.noNulls, oneColumn.isNull, cIdx, rowNumber, dout);
           break;
         default:
@@ -158,20 +161,36 @@ public class OrcParser extends Parser {
    * @param rowNumber
      * @param dout
      */
-  private void writeTimecolumn(ColumnVector oneTSColumn, boolean noNulls, boolean[] isNull, int cIdx,
+  private void writeTimecolumn(ColumnVector oneTSColumn, String columnType, boolean noNulls, boolean[] isNull, int cIdx,
                                       Long rowNumber, ParseWriter dout) {
     long[] oneColumn = ((LongColumnVector) oneTSColumn).vector;
 
     if (noNulls) {
-      for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
-          dout.addNumCol(cIdx, oneColumn[rowIndex]);  // number of seconds since Jan 1, 2015.
-      }
+      switch (columnType) {
+        case "timestamp":
+          for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+            dout.addNumCol(cIdx, oneColumn[rowIndex]/1000000);
+          }
+          break;
+        default:
+          for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+            dout.addNumCol(cIdx, (oneColumn[rowIndex]*DAY_TO_MS+ADD_OFFSET));
+          }
+        }
+
     } else {
       for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
         if (isNull[rowIndex])
           dout.addInvalidCol(cIdx);
-        else
-          dout.addNumCol(cIdx, oneColumn[rowIndex]);  // number of seconds since Jan 1, 2015.
+        else {
+          switch (columnType) {
+            case "timestamp":
+              dout.addNumCol(cIdx, oneColumn[rowIndex]/1000000);
+              break;
+            default:
+              dout.addNumCol(cIdx, (oneColumn[rowIndex]*DAY_TO_MS+ADD_OFFSET));
+          }
+        }
       }
     }
   }
