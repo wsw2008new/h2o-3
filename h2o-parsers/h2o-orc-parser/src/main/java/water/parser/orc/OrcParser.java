@@ -179,17 +179,19 @@ public class OrcParser extends Parser {
         }
 
     } else {
-      for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
-        if (isNull[rowIndex])
-          dout.addInvalidCol(cIdx);
-        else {
-          switch (columnType) {
-            case "timestamp":
-              dout.addNumCol(cIdx, oneColumn[rowIndex]/1000000);
-              break;
-            default:
-              dout.addNumCol(cIdx, (oneColumn[rowIndex]*DAY_TO_MS+ADD_OFFSET));
-          }
+      if (columnType.contains("timestamp")) {
+        for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+          if (isNull[rowIndex])
+            dout.addInvalidCol(cIdx);
+          else
+                dout.addNumCol(cIdx, oneColumn[rowIndex] / 1000000);
+        }
+      } else {  // date
+        for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+          if (isNull[rowIndex])
+            dout.addInvalidCol(cIdx);
+          else
+                dout.addNumCol(cIdx, (oneColumn[rowIndex] * DAY_TO_MS + ADD_OFFSET));
         }
       }
     }
