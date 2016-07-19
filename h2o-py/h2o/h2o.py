@@ -55,7 +55,6 @@ def deprecated(message):
 h2oconn = None
 
 
-@translate_args
 def connect(server=None, url=None, ip=None, port=None, https=None, verify_ssl_certificates=None, auth=None,
             proxy=None, cluster_name=None, verbose=True):
     """
@@ -84,14 +83,12 @@ def connect(server=None, url=None, ip=None, port=None, https=None, verify_ssl_ce
     return h2oconn
 
 
-@translate_args
 def api(endpoint, data=None, json=None, filename=None):
     """Perform a REST API request to a previously connected server."""
     assert h2oconn is not None, "Connection was not established. Did you run `h2o.connect()`?"
     return h2oconn.request(endpoint, data=data, json=json, filename=filename)
 
 
-@translate_args
 def start(jar_path=None, nthreads=-1, enable_assertions=True, max_mem_size=None, min_mem_size=None, ice_root=None,
           port="54321+", verbose=True):
     """
@@ -196,7 +193,7 @@ def init(url=None, ip=None, port=None, https=None, insecure=False, username=None
                 proxy=proxy, cluster_name=cluster_name, verbose=True)
     except H2OConnectionError:
         # Backward compatibility: in init() port parameter really meant "baseport" when starting a local server...
-        if not str(port).endswith("+"):
+        if port and not str(port).endswith("+"):
             port = str(port) + "+"
         if not start_h2o: raise
         global h2oconn
@@ -208,7 +205,6 @@ def init(url=None, ip=None, port=None, https=None, insecure=False, username=None
         version_check()
 
 
-@translate_args
 def lazy_import(path):
     """Import a single file or collection of files.
 
@@ -226,8 +222,8 @@ def _import(path):
     return j['destination_frames']
 
 
-@translate_args
-def upload_file(path, destination_frame="", header=(-1, 0, 1), sep="", col_names=None, col_types=None, na_strings=None):
+def upload_file(path, destination_frame="", header=(-1, 0, 1), sep="", col_names=None, col_types=None,
+                na_strings=None):
     """Upload a dataset at the path given from the local machine to the H2O cluster. Does a single-threaded push to H2O.
     Also see import_file.
 
@@ -282,7 +278,6 @@ def upload_file(path, destination_frame="", header=(-1, 0, 1), sep="", col_names
     return H2OFrame()._upload_parse(path, destination_frame, header, sep, col_names, col_types, na_strings)
 
 
-@translate_args
 def import_file(path=None, destination_frame="", parse=True, header=(-1, 0, 1), sep="",
                 col_names=None, col_types=None, na_strings=None):
     """Have H2O import a dataset into memory. The path to the data must be a valid path for
@@ -344,7 +339,6 @@ def import_file(path=None, destination_frame="", parse=True, header=(-1, 0, 1), 
                                     col_types, na_strings)
 
 
-@translate_args
 def import_sql_table(connection_url, table, username, password, columns=None, optimize=None):
     """Import SQL table to H2OFrame in memory. Assumes that the SQL table is not being updated and is stable.
     Runs multiple SELECT SQL queries concurrently for parallel ingestion.
@@ -397,7 +391,6 @@ def import_sql_table(connection_url, table, username, password, columns=None, op
     return get_frame(j.dest_key)
 
 
-@translate_args
 def import_sql_select(connection_url, select_query, username, password, optimize=None):
     """Imports the SQL table that is the result of the specified SQL query to H2OFrame in memory.
     Creates a temporary SQL table from the specified sql_query.
@@ -445,9 +438,8 @@ def import_sql_select(connection_url, select_query, username, password, optimize
     return get_frame(j.dest_key)
 
 
-@translate_args
-def parse_setup(raw_frames, destination_frame="", header=(-1, 0, 1), separator="", column_names=None, column_types=None,
-                na_strings=None):
+def parse_setup(raw_frames, destination_frame="", header=(-1, 0, 1), separator="", column_names=None,
+                column_types=None, na_strings=None):
     """During parse setup, the H2O cluster will make several guesses about the attributes of
     the data. This method allows a user to perform corrective measures by updating the
     returning dictionary from this method. This dictionary is then fed into `parse_raw` to
@@ -502,7 +494,7 @@ def parse_setup(raw_frames, destination_frame="", header=(-1, 0, 1), separator="
     """
 
     # The H2O backend only accepts things that are quoted
-    if isinstance(raw_frames, str): raw_frames = [raw_frames]
+    if is_str(raw_frames): raw_frames = [raw_frames]
 
     # temporary dictionary just to pass the following information to the parser: header, separator
     kwargs = {}
@@ -513,7 +505,7 @@ def parse_setup(raw_frames, destination_frame="", header=(-1, 0, 1), separator="
 
     # set separator
     if separator:
-        if not isinstance(separator, str) or len(separator) != 1:
+        if not is_str(separator) or len(separator) != 1:
             raise ValueError("separator should be a single character string; got %r" % separator)
         kwargs["separator"] = ord(separator)
 
@@ -521,8 +513,8 @@ def parse_setup(raw_frames, destination_frame="", header=(-1, 0, 1), separator="
     if j['warnings']:
         for w in j['warnings']:
             warnings.warn(w)
-    if destination_frame: j["destination_frame"] = destination_frame.replace("%", ".").replace("&",
-                                                                                               ".")  # TODO: really should be url encoding...
+    # TODO: really should be url encoding...
+    if destination_frame: j["destination_frame"] = destination_frame.replace("%", ".").replace("&", ".")
     if column_names is not None:
         if not isinstance(column_names, list): raise ValueError("col_names should be a list")
         if len(column_names) != len(j["column_types"]): raise ValueError(
@@ -530,7 +522,8 @@ def parse_setup(raw_frames, destination_frame="", header=(-1, 0, 1), separator="
         j["column_names"] = column_names
     if column_types is not None:
         if isinstance(column_types, dict):
-            # overwrite dictionary to ordered list of column types. if user didn't specify column type for all names, use type provided by backend
+            # overwrite dictionary to ordered list of column types. if user didn't specify column type for all names,
+            # use type provided by backend
             if j["column_names"] is None:  # no colnames discovered! (C1, C2, ...)
                 j["column_names"] = gen_header(j["number_columns"])
             if not set(column_types.keys()).issubset(set(j["column_names"])): raise ValueError(
@@ -561,7 +554,7 @@ def parse_setup(raw_frames, destination_frame="", header=(-1, 0, 1), separator="
             j["na_strings"] = [[] for _ in range(len(j["column_names"]))]
             for name, na in na_strings.items():
                 idx = j["column_names"].index(name)
-                if isinstance(na, str): na = [na]
+                if is_str(na): na = [na]
                 for n in na: j["na_strings"][idx].append(quoted(n))
         elif is_list_of_lists(na_strings):
             if len(na_strings) != len(j["column_types"]): raise ValueError(
@@ -580,7 +573,6 @@ def parse_setup(raw_frames, destination_frame="", header=(-1, 0, 1), separator="
     return j
 
 
-@translate_args
 def parse_raw(setup, id=None, first_line_is_header=(-1, 0, 1)):
     """Used in conjunction with lazy_import and parse_setup in order to make alterations
     before parsing.
@@ -609,7 +601,6 @@ def parse_raw(setup, id=None, first_line_is_header=(-1, 0, 1)):
     return fr
 
 
-@translate_args
 def assign(data, xid):
     if data.frame_id == xid: ValueError("Desination key must differ input frame")
     data._ex = ExprNode("assign", xid, data)._eval_driver(False)
@@ -618,9 +609,8 @@ def assign(data, xid):
     return data
 
 
-@translate_args
 def get_model(model_id):
-    """Return the specified model
+    """Return the specified model.
 
     Parameters
     ----------
@@ -631,9 +621,9 @@ def get_model(model_id):
       -------
         Subclass of H2OEstimator
     """
-    model_json = h2oconn.get_json("Models/"+model_id)["models"][0]
+    model_json = api("GET /3/Models/%s" % model_id)["models"][0]
     algo = model_json["algo"]
-    if   algo == "svd":          m = H2OSVD()
+    if algo == "svd":            m = H2OSVD()
     elif algo == "pca":          m = H2OPCA()
     elif algo == "drf":          m = H2ORandomForestEstimator()
     elif algo == "naivebayes":   m = H2ONaiveBayesEstimator()
@@ -641,17 +631,19 @@ def get_model(model_id):
     elif algo == "glrm":         m = H2OGeneralizedLowRankEstimator()
     elif algo == "glm":          m = H2OGeneralizedLinearEstimator()
     elif algo == "gbm":          m = H2OGradientBoostingEstimator()
-    elif algo == "deeplearning" and model_json["output"]["model_category"]=="AutoEncoder": m = H2OAutoEncoderEstimator()
-    elif algo == "deeplearning": m = H2ODeepLearningEstimator()
+    elif algo == "deeplearning":
+        if model_json["output"]["model_category"] == "AutoEncoder":
+            m = H2OAutoEncoderEstimator()
+        else:
+            m = H2ODeepLearningEstimator()
     else:
         raise ValueError("Unknown algo type: " + algo)
     m._resolve_model(model_id, model_json)
     return m
 
 
-@translate_args
 def get_grid(grid_id):
-    """Return the specified grid
+    """Return the specified grid.
 
     Parameters
     ----------
@@ -679,7 +671,6 @@ def get_grid(grid_id):
     return gs
 
 
-@translate_args
 def get_frame(frame_id):
     """Obtain a handle to the frame in H2O with the frame_id key.
 
@@ -714,7 +705,6 @@ def show_progress():
     H2OJob.__PROGRESS_BAR__ = True
 
 
-@translate_args
 def log_and_echo(message):
     """Log a message on the server-side logs
     This is helpful when running several pieces of work one after the other on a single H2O
@@ -751,7 +741,7 @@ def remove(x):
         elif isinstance(xi, H2OEstimator):
             h2oconn.delete("DKV/" + xi.model_id)
             xi._id = None
-        elif isinstance(xi, str):
+        elif is_str(xi):
             # string may be a Frame key name part of a rapids session... need to call rm thru rapids here
             try:
                 rapids("(rm {})".format(xi))
@@ -766,7 +756,6 @@ def remove_all():
     h2oconn.request("DELETE /3/DKV")
 
 
-@translate_args
 def rapids(expr):
     """Execute a Rapids expression.
 
@@ -792,7 +781,6 @@ def ls():
     return H2OFrame._expr(expr=ExprNode("ls")).as_data_frame(use_pandas=True)
 
 
-@translate_args
 def frame(frame_id, exclude=""):
     """Retrieve metadata for an id that points to a Frame.
 
@@ -815,10 +803,9 @@ def frames():
     -------
       Meta information on the frames
     """
-    return h2oconn.get_json("Frames")
+    return api("GET /3/Frames")
 
 
-@translate_args
 def download_pojo(model, path="", get_jar=True):
     """Download the POJO for this model to the directory specified by path (no trailing
     slash!). If path is "", then dump to screen.
@@ -834,7 +821,7 @@ def download_pojo(model, path="", get_jar=True):
       get_jar : bool
         Retrieve the h2o-genmodel.jar also.
     """
-    java = h2oconn.get("Models.java/" + model.model_id)
+    java = api("GET /3/Models.java/%s" % model.model_id)
 
     # HACK: munge model._id so that it conforms to Java class name. For example, change K-means to K_means.
     # TODO: clients should extract Java class name from header.
@@ -856,7 +843,6 @@ def download_pojo(model, path="", get_jar=True):
             f.write(response.read())
 
 
-@translate_args
 def download_csv(data, filename):
     """Download an H2O data set to a CSV file on the local disk.
 
@@ -878,7 +864,6 @@ def download_csv(data, filename):
         f.write(urlopen()(url).read())
 
 
-@translate_args
 def download_all_logs(dirname=".", filename=None):
     """Download H2O Log Files to Disk
 
@@ -917,7 +902,6 @@ def download_all_logs(dirname=".", filename=None):
     return path
 
 
-@translate_args
 def save_model(model, path="", force=False):
     """Save an H2O Model Object to Disk.
 
@@ -940,7 +924,6 @@ def save_model(model, path="", force=False):
     return h2oconn.get_json("Models.bin/" + model.model_id, dir=path, force=force, _rest_version=99)["dir"]
 
 
-@translate_args
 def load_model(path):
     """
     Load a saved H2O model from disk.
@@ -993,7 +976,6 @@ def cluster_status():
     print()
 
 
-@translate_args
 def export_file(frame, path, force=False):
     """Export a given H2OFrame to a path on the machine this python session is currently
     connected to. To view the current session, call h2o.cluster_info().
@@ -1009,7 +991,7 @@ def export_file(frame, path, force=False):
     """
     H2OJob(h2oconn.get_json(
         "Frames/" + frame.frame_id + "/export/" + path + "/overwrite/" + ("true" if force else "false")),
-           "Export File").poll()
+        "Export File").poll()
 
 
 def cluster_info():
@@ -1019,7 +1001,6 @@ def cluster_info():
     h2oconn.info().pprint()
 
 
-@translate_args
 def shutdown(prompt=True):
     """
     Shut down the specified instance. All data will be lost.
@@ -1031,7 +1012,6 @@ def shutdown(prompt=True):
     h2oconn.shutdown(prompt)
 
 
-@translate_args
 def create_frame(id=None, rows=10000, cols=10, randomize=True, value=0, real_range=100,
                  categorical_fraction=0.2, factors=100, integer_fraction=0.2, integer_range=100,
                  binary_fraction=0.1, binary_ones_fraction=0.02, time_fraction=0, string_fraction=0,
@@ -1133,7 +1113,6 @@ def create_frame(id=None, rows=10000, cols=10, randomize=True, value=0, real_ran
     return get_frame(parms["dest"])
 
 
-@translate_args
 def interaction(data, factors, pairwise, max_factors, min_occurrence, destination_frame=None):
     """
     Categorical Interaction Feature Creation in H2O.
@@ -1166,7 +1145,7 @@ def interaction(data, factors, pairwise, max_factors, min_occurrence, destinatio
     -------
       H2OFrame
     """
-    factors = [data.names[n] if isinstance(n, int) else n for n in factors]
+    factors = [data.names[n] if is_int(n) else n for n in factors]
     parms = {"dest": py_tmp_key(append=h2oconn.session_id()) if destination_frame is None else destination_frame,
              "source_frame": data.frame_id,
              "factor_columns": [quoted(f) for f in factors],
@@ -1178,7 +1157,6 @@ def interaction(data, factors, pairwise, max_factors, min_occurrence, destinatio
     return get_frame(parms["dest"])
 
 
-@translate_args
 def as_list(data, use_pandas=True):
     """Convert an H2O data object into a python-specific object.
 
@@ -1208,7 +1186,6 @@ def network_test():
     res.table.show()
 
 
-@translate_args
 def set_timezone(tz):
     """Set the Time Zone on the H2O Cloud
 
